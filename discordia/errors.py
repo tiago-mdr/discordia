@@ -92,7 +92,7 @@ class MissingAnnotationError(DependencyError):
         path_str = format_error_path(self.path, self.callback, self.parameter)
 
         return (
-            f'inspect.Parameter "{self.parameter.name}" in callback '
+            f'Parameter "{self.parameter.name}" in callback '
             f'"{self.callback.__name__}" does not have a type annotation.\n\n'
             "Add a type annotation or provide a default value.\n\n"
             f"Path:\n{path_str}"
@@ -121,7 +121,7 @@ class ScopeError(DependencyError):
         path_str = format_error_path(self.path, self.callback, self.parameter)
 
         return (
-            f'inspect.Parameter "{self.parameter.name}" in callback '
+            f'Parameter "{self.parameter.name}" in callback '
             f'"{self.callback.__name__}" depends on a scoped or transient '
             "dependency from a singleton context. This can leak dependencies "
             "or cause runtime bugs.\n\n"
@@ -177,6 +177,6 @@ class SlashCommandDefinitionError(DiscordiaError):
     parameter: inspect.Parameter = attrs.field()
 
     def __attrs_post_init__(self) -> None:
-        context = f"function: {self.func.__name__}\nparameter: {self.parameter}\nlocal: {inspect.getfile(self.func)}"
+        context = f"function: {self.func.__name__}\nparameter: {self.parameter}\nlocation: {inspect.getfile(self.func)}"
 
         self.reason += "\n\n" + context

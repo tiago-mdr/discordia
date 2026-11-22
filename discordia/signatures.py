@@ -52,6 +52,15 @@ def is_equals(source: object, target: object) -> bool:
     return False
 
 
+def find_for_type[T](callback: abc.Callable[..., object], target: type[T]) -> type[T] | None:
+    signature = SignatureManager.get_signature(callback, cache=False)
+    for param in signature.parameters.values():
+        if is_equals(param.annotation, target):
+            return param.annotation
+
+    return None
+
+
 def _get_callable_globals(fn: abc.Callable[..., object]) -> dict[str, typing.Any]:
     unwrapped = inspect.unwrap(fn)
 
@@ -162,12 +171,3 @@ class SignatureManager:
     @classmethod
     def clear_cache(cls) -> None:
         cls._cache.clear()
-
-
-def find_for_type[T](callback: abc.Callable[..., object], target: type[T]) -> type[T] | None:
-    signature = SignatureManager.get_signature(callback, cache=False)
-    for param in signature.parameters.values():
-        if is_equals(param.annotation, target):
-            return param.annotation
-
-    return None

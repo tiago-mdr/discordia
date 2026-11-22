@@ -156,21 +156,21 @@ class DependencyGraphValidator:
         container: DependencyContainer,
         lazy_types: set[type],
         call_stack: list[abc.Callable[..., object]] | None = None,
-        current_scope: _Scope | None = None,
+        *,
+        in_singleton: bool = False,
     ) -> None:
         self._call = call
         self._signature = signature
         self._container = container
         self._lazy_types = lazy_types
         self._call_stack = [] if call_stack is None else call_stack
-        self._current_scope = current_scope
+        self._in_singleton = in_singleton
         self._current_parameter: ParameterContext
 
     def _validate_dependency(self, dependency: Dependency) -> None:
-        if self._current_scope is None:
-            self._current_scope = dependency.scope
+        in_singleton = self._in_singleton or dependency.scope is _Scope.SINGLETON
 
-        if self._current_scope is _Scope.SINGLETON and dependency.scope is not _Scope.SINGLETON:
+        if in_singleton and dependency.scope is not _Scope.SINGLETON:
             raise errors.ScopeError(self._call, self._current_parameter.parameter)
 
         try:
@@ -180,7 +180,7 @@ class DependencyGraphValidator:
                 self._container,
                 self._lazy_types,
                 self._call_stack,
-                self._current_scope,
+                in_singleton=in_singleton,
             ).validate()
 
             if signatures.is_equals(dependency.return_type, self._current_parameter.parameter_type):
