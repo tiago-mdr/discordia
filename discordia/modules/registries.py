@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 from collections import abc
 
@@ -6,7 +8,9 @@ import hikari
 
 from discordia import handlers
 from discordia.interactions import commands, components
-from discordia.modules.module import Module
+
+if typing.TYPE_CHECKING:
+    from discordia.modules.module import Module
 
 
 @attrs.frozen()
