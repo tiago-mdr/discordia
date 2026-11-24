@@ -4,6 +4,8 @@ from collections import abc
 import attrs
 from hikari.events import Event
 
+from discordia import di
+
 
 @attrs.define(init=False)
 class EventResponder:
@@ -20,3 +22,7 @@ class EventResponder:
 
         if callback is not None:
             self.callbacks.add(callback)
+
+    def validate(self, validator: di.DependencyManager) -> None:
+        for callback in self.callbacks:
+            validator.validate(callback, {self.event})

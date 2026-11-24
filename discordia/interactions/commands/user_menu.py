@@ -6,6 +6,8 @@ import hikari
 from hikari.impl import ContextMenuCommandBuilder
 from hikari.undefined import UNDEFINED
 
+from discordia import di
+
 
 @attrs.define()
 class UserMenu:
@@ -31,6 +33,10 @@ class UserMenu:
             raise ValueError(msg)
 
         return response
+
+    def validate(self, validator: di.DependencyManager) -> None:
+        lazy_types = {hikari.CommandInteraction, hikari.Member}
+        validator.validate(self.callback, lazy_types)
 
     def build(self) -> ContextMenuCommandBuilder:
         return ContextMenuCommandBuilder(

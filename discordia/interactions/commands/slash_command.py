@@ -3,10 +3,9 @@ from collections import abc
 
 import attrs
 import hikari
-from hikari import impl
 from hikari.undefined import UNDEFINED
 
-from discordia import errors, signatures
+from discordia import di, errors, signatures
 
 if typing.TYPE_CHECKING:
     import inspect
@@ -234,6 +233,20 @@ class SlashCommandResponder:
             case _:
                 return None
 
+    def validate(self, validator: di.DependencyManager) -> None:
+        lazy_types = {
+            str,
+            bool,
+            int,
+            float,
+            hikari.CommandInteraction,
+            hikari.InteractionChannel,
+            hikari.User,
+            hikari.Attachment,
+            hikari.Role,
+        }
+        validator.validate(self.callback, lazy_types)
+
     def parse_options(
         self,
         options: abc.Sequence[hikari.CommandInteractionOption] | None = None,
@@ -316,6 +329,9 @@ class SubCommand:
     def responder(self, func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
         self._responder = SlashCommandResponder(func)
         return self
+
+    def validate(self, validator: di.DependencyManager) -> None:
+        self.get_responder().validate(validator)
 
     def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], typing.Self]:
         def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
@@ -401,6 +417,10 @@ class SubCommandGroup:
         msg = f'Subcommand "{subcommand_name}" was not found in command group "{self.name}".'
         raise ValueError(msg)
 
+    def validate(self, validator: di.DependencyManager) -> None:
+        for subcommand in self.subcommands.values():
+            subcommand.validate(validator)
+
     def parse_interaction_group(
         self,
         subcommand_interaction: hikari.CommandInteractionOption,
@@ -471,6 +491,16 @@ class SlashCommand:
             return self._responder
         msg = f'Slash command "{self.name}" does not have a registered responder callback.'
         raise ValueError(msg)
+
+    def validate(self, validator: di.DependencyManager) -> None:
+        if self._responder:
+            self._responder.validate(validator)
+        else:
+            for subcommand in self._subcommands.values():
+                subcommand.validate(validator)
+
+            for subcommand_group in self._subcommands_group.values():
+                subcommand_group.validate(validator)
 
     def add_subcommand(self, subcommand: SubCommand) -> None:
         if subcommand.name in self._subcommands:
@@ -576,7 +606,7 @@ class SlashCommand:
         msg = f'Slash command "{self.name}" does not have an autocomplete handler registered.'
         raise ValueError(msg)
 
-    def build(self) -> impl.SlashCommandBuilder:
+    def build(self) -> hikari.impl.SlashCommandBuilder:
         options: list[hikari.CommandOption] = []
         if self._responder:
             options.extend(self._responder.option_map.values())
@@ -587,7 +617,7 @@ class SlashCommand:
             for subcommand_group in self._subcommands_group.values():
                 options.append(subcommand_group.build())
 
-        return impl.SlashCommandBuilder(
+        return hikari.impl.SlashCommandBuilder(
             name=self.name,
             description=self.description,
             default_member_permissions=self.default_member_permissions,

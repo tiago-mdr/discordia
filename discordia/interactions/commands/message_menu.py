@@ -6,6 +6,8 @@ import hikari
 from hikari.impl import ContextMenuCommandBuilder
 from hikari.undefined import UNDEFINED
 
+from discordia import di
+
 
 @attrs.define()
 class MessageMenu:
@@ -23,6 +25,10 @@ class MessageMenu:
 
         msg = f"Message with target_id {interaction.target_id} was not found in resolved interaction data."
         raise ValueError(msg)
+
+    def validate(self, validator: di.DependencyManager) -> None:
+        lazy_types = {hikari.CommandInteraction, hikari.Message}
+        validator.validate(self.callback, lazy_types)
 
     def build(self) -> ContextMenuCommandBuilder:
         return ContextMenuCommandBuilder(

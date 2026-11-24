@@ -5,7 +5,7 @@ from typing import Any, get_origin
 import attrs
 import hikari
 
-from discordia import signatures
+from discordia import di, signatures
 
 
 @attrs.define()
@@ -86,8 +86,7 @@ class SelectMenu:
 
         if interaction.resolved is None:
             msg = (
-                f"Select menu interaction is of type {self.type}, "
-                "but contains no resolved data to extract values from."
+                f"Select menu interaction is of type {self.type}, but contains no resolved data to extract values from."
             )
             raise ValueError(msg)
 
@@ -112,3 +111,7 @@ class SelectMenu:
                 pass
 
         return response
+
+    def validate(self, validator: di.DependencyManager) -> None:
+        lazy_types = {hikari.ComponentInteraction, list}
+        validator.validate(self.callback, lazy_types)
