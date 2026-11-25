@@ -493,14 +493,14 @@ class SlashCommand:
         raise ValueError(msg)
 
     def validate(self, validator: di.DependencyManager) -> None:
-        if self._responder:
-            self._responder.validate(validator)
-        else:
+        if self._subcommands or self._subcommands_group:
             for subcommand in self._subcommands.values():
                 subcommand.validate(validator)
 
             for subcommand_group in self._subcommands_group.values():
                 subcommand_group.validate(validator)
+        elif self._responder:
+            self._responder.validate(validator)
 
     def add_subcommand(self, subcommand: SubCommand) -> None:
         if subcommand.name in self._subcommands:
@@ -541,6 +541,22 @@ class SlashCommand:
             msg = f'Subcommand group "{subcommand_group.name}" already exists in slash command "{self.name}".'
             raise ValueError(msg)
         self._subcommands_group[subcommand_group.name] = subcommand_group
+
+    def subcommand_group(
+        self,
+        name: str,
+        description: str = "...",
+        name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
+        description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
+    ) -> SubCommandGroup:
+        group = SubCommandGroup(
+            name,
+            description=description,
+            name_localizations=name_localizations if name_localizations is not None else {},
+            description_localizations=description_localizations if description_localizations is not None else {},
+        )
+        self.add_subcommand_group(group)
+        return group
 
     def get_subcommand_group(self, subcommand_group_name: str) -> SubCommandGroup:
         subcommand_group = self._subcommands_group.get(subcommand_group_name)
@@ -608,14 +624,14 @@ class SlashCommand:
 
     def build(self) -> hikari.impl.SlashCommandBuilder:
         options: list[hikari.CommandOption] = []
-        if self._responder:
-            options.extend(self._responder.option_map.values())
-        else:
+        if self._subcommands or self._subcommands_group:
             for subcommand in self._subcommands.values():
                 options.append(subcommand.build())
 
             for subcommand_group in self._subcommands_group.values():
                 options.append(subcommand_group.build())
+        elif self._responder:
+            options.extend(self._responder.option_map.values())
 
         return hikari.impl.SlashCommandBuilder(
             name=self.name,
