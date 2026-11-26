@@ -1,0 +1,58 @@
+[project]
+name = "discordia"
+version = "0.1.0"
+description = "A simple, powerful, and modular Discord framework, built on top of Hikari."
+authors = [
+    { name = "Tiago de Souza Medeiros", email = "tiago.medeiros8000@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "attrs>=26.1.0",
+    "hikari>=2.6.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "."
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+fix = true
+show-fixes = true
+indent-width = 4
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D", # docstring (temporary)
+    "CPY001", # missing copyright notice (temporary)
+    "S101",   # use of assert
+    "COM812",  # missing trailing comma (conflict with the formatter)
+    "TRY301", # raise within try (used to add context to errors)
+    "PLR0911", # too many return statements
+    "PLR0912", # too many branches (consider remove in future)
+    "PLR0913" # too many arguments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "ALL"
+]
+
+[tool.pyright]
+include = ["discordia"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"

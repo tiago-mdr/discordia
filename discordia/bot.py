@@ -52,14 +52,9 @@ class Bot(modules.Module):
         app = await rest.fetch_application()
         commands: list[hikari.api.CommandBuilder] = []
 
-        for slash_command in self.registers.slash_commands:
-            commands.append(slash_command.build())
-
-        for user_menu in self.registers.user_menus:
-            commands.append(user_menu.build())
-
-        for message_menu in self.registers.message_menus:
-            commands.append(message_menu.build())
+        commands.extend(slash_command.build() for slash_command in self.registers.slash_commands)
+        commands.extend(user_menu.build() for user_menu in self.registers.user_menus)
+        commands.extend(message_menu.build() for message_menu in self.registers.message_menus)
 
         await rest.set_application_commands(app, commands, guild)
 

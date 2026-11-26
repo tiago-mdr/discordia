@@ -22,9 +22,7 @@ def format_error_path(
     callback: abc.Callable[..., object],
     parameter: inspect.Parameter | None = None,
 ) -> str:
-    path_str: list[str] = []
-    for context in reversed(path):
-        path_str.append(f"-> {context.callback.__name__} ({context.parameter})")
+    path_str = [f"-> {context.callback.__name__} ({context.parameter})" for context in reversed(path)]
 
     final = f"* {callback.__name__}"
     if parameter:

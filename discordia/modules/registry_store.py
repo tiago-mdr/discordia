@@ -42,7 +42,7 @@ class RegistryStore:
     def unmerge(self, registries: set[registries.RegistrationData[typing.Any]], destination: RegistryStore) -> None:
         for registry in registries:
             data = registry.data
-            data_type: type[typing.Any] = type(data)  # type: ignore
+            data_type: type[typing.Any] = type(data)  # type: ignore[reportUnknownVariableType]
             my_registry = self._map.get(data_type)
             other_registry = destination._map.get(data_type)
 

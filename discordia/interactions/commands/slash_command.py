@@ -592,7 +592,7 @@ class SlashCommand:
             subcommand_group = self._unwrap_subcommand_group(option)
             if subcommand_group:
                 # Subcommand group guarantees that a nested subcommand option exists
-                assert option.options is not None  # noqa: S101
+                assert option.options is not None
                 return subcommand_group.parse_interaction_group(option.options[0], interaction.resolved)
 
         responder = self.get_responder()
@@ -612,7 +612,7 @@ class SlashCommand:
             subcommand_group = self._unwrap_subcommand_group(option)
             if subcommand_group:
                 # Subcommand group guarantees that a nested subcommand option exists
-                assert option.options is not None  # noqa: S101
+                assert option.options is not None
                 return subcommand_group.parse_autocomplete_group(option.options[0])
 
         responder = self.get_responder()
@@ -624,12 +624,10 @@ class SlashCommand:
 
     def build(self) -> hikari.impl.SlashCommandBuilder:
         options: list[hikari.CommandOption] = []
-        if self._subcommands or self._subcommands_group:
-            for subcommand in self._subcommands.values():
-                options.append(subcommand.build())
 
-            for subcommand_group in self._subcommands_group.values():
-                options.append(subcommand_group.build())
+        if self._subcommands or self._subcommands_group:
+            options.extend(subcommand.build() for subcommand in self._subcommands.values())
+            options.extend(subcommand_group.build() for subcommand_group in self._subcommands_group.values())
         elif self._responder:
             options.extend(self._responder.option_map.values())
 
