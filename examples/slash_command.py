@@ -18,10 +18,7 @@ async def imitate(interaction: hikari.CommandInteraction, text: str) -> None:
 
 # Command with custom option metadata using Annotated[Type, Option(...)].
 # Option allows configuring custom name, description, min/max constraints, autocomplete, etc.
-@bot.interactions.slash_command(
-    name="autocomplete",
-    description="Demonstrates dynamic autocomplete options"
-)
+@bot.interactions.slash_command(name="autocomplete", description="Demonstrates dynamic autocomplete options")
 async def autocomplete_test(
     interaction: hikari.CommandInteraction,
     chosen_value: Annotated[
@@ -30,8 +27,8 @@ async def autocomplete_test(
             name="number",
             description="Pick a number from the interactive list",
             autocomplete=True,
-        )
-    ]
+        ),
+    ],
 ) -> None:
     msg = f"You chose: {chosen_value}"
     await interaction.create_initial_response(hikari.ResponseType.MESSAGE_CREATE, msg)
@@ -41,10 +38,7 @@ async def autocomplete_test(
 # Use `@command.autocomplete("parameter_name")`.
 # Discordia injects the AutocompleteInteraction and the current value typed by the user.
 @autocomplete_test.autocomplete("chosen_value")
-async def autocomplete_value(
-    interaction: hikari.AutocompleteInteraction,
-    chosen_value: str
-) -> None:
+async def autocomplete_value(interaction: hikari.AutocompleteInteraction, chosen_value: str) -> None:
     # Example dataset: numbers from 0 to 49
     all_numbers = [str(i) for i in range(50)]
     choices: list[hikari.impl.AutocompleteChoiceBuilder] = []

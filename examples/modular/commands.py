@@ -16,16 +16,10 @@ mod = Module()
 @mod.interactions.slash_command(description="Test command defined inside an independent module")
 async def ping(interaction: hikari.CommandInteraction) -> None:
     row = hikari.impl.MessageActionRowBuilder()
-    row.add_interactive_button(
-        hikari.ButtonStyle.PRIMARY,
-        "module_button",
-        label="Module Button"
-    )
+    row.add_interactive_button(hikari.ButtonStyle.PRIMARY, "module_button", label="Module Button")
 
     await interaction.create_initial_response(
-        hikari.ResponseType.MESSAGE_CREATE,
-        "Pong! This command was defined inside a separate module.",
-        component=row
+        hikari.ResponseType.MESSAGE_CREATE, "Pong! This command was defined inside a separate module.", component=row
     )
 
 
@@ -34,5 +28,5 @@ async def on_module_button_click(interaction: hikari.ComponentInteraction) -> No
     await interaction.create_initial_response(
         hikari.ResponseType.MESSAGE_CREATE,
         "You clicked the button managed by the module!",
-        flags=hikari.MessageFlag.EPHEMERAL
+        flags=hikari.MessageFlag.EPHEMERAL,
     )

@@ -15,20 +15,16 @@ bot = Bot(gateway_bot)
 
 # Commands that may raise exceptions
 @bot.interactions.slash_command(description="Command demonstrating error handling")
-async def divide(
-    interaction: hikari.CommandInteraction,
-    dividend: int,
-    divisor: int
-) -> None:
+async def divide(interaction: hikari.CommandInteraction, dividend: int, divisor: int) -> None:
     # A ZeroDivisionError may occur here
     result = dividend / divisor
     await interaction.create_initial_response(
-        hikari.ResponseType.MESSAGE_CREATE,
-        f"Result: `{dividend} / {divisor}` = **{result}**"
+        hikari.ResponseType.MESSAGE_CREATE, f"Result: `{dividend} / {divisor}` = **{result}**"
     )
 
 
 # Global Error Handler #
+
 
 # When a slash command fails, the router wraps the exception in CommandInteractionRoutingError
 # and preserves the original exception in `error.__cause__`.
@@ -44,9 +40,7 @@ async def handle_command_error(error: CommandInteractionRoutingError) -> None:
 
     # Respond to the user with an ephemeral message
     await interaction.create_initial_response(
-        hikari.ResponseType.MESSAGE_CREATE,
-        user_message,
-        flags=hikari.MessageFlag.EPHEMERAL
+        hikari.ResponseType.MESSAGE_CREATE, user_message, flags=hikari.MessageFlag.EPHEMERAL
     )
 
 

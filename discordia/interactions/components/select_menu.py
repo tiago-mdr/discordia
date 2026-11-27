@@ -46,13 +46,13 @@ class SelectMenu:
                 return False
 
     def _extract_field(self) -> str | None:
-        signature = signatures.SignatureManager.get_signature(self.callback, cache=True)
+        signature = signatures.SignatureManager.get_signature(self.callback)
 
         for parameter in signature.parameters.values():
             if parameter.annotation is parameter.empty or get_origin(parameter.annotation) is not list:
                 continue
 
-            types = signatures.extract_args(parameter.annotation)
+            types = typing.get_args(parameter.annotation)
             if self._is_compatible(types):
                 return parameter.name
 

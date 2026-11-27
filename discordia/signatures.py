@@ -20,10 +20,6 @@ def is_union(annotation: object) -> bool:
     return origin is typing.Union or origin is types.UnionType
 
 
-def extract_args(annotation: object) -> tuple[object, ...]:
-    return typing.get_args(annotation)
-
-
 def is_equals(source: object, target: object) -> bool:
     if source == target or target is typing.Any or target is object:
         return True
@@ -33,12 +29,12 @@ def is_equals(source: object, target: object) -> bool:
 
     if is_union(target):
         if is_union(source):
-            args_source = extract_args(source)
-            args_target = extract_args(target)
+            args_source = typing.get_args(source)
+            args_target = typing.get_args(target)
 
             return all(any(is_equals(arg1, arg2) for arg2 in args_target) for arg1 in args_source)
 
-        if any(is_equals(source, branch) for branch in extract_args(target)):
+        if any(is_equals(source, branch) for branch in typing.get_args(target)):
             return True
 
     if inspect.isclass(source):
@@ -53,7 +49,7 @@ def is_equals(source: object, target: object) -> bool:
 
 
 def find_for_type[T](callback: abc.Callable[..., object], target: type[T]) -> type[T] | None:
-    signature = SignatureManager.get_signature(callback, cache=False)
+    signature = SignatureManager.get_signature(callback)
     for param in signature.parameters.values():
         if is_equals(param.annotation, target):
             return param.annotation

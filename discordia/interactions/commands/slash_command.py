@@ -118,12 +118,12 @@ class SlashCommandExtractor:
 
     def _unwrap_annotations(self, annotation: object) -> tuple[object, ...]:
         if signatures.is_union(annotation):
-            return signatures.extract_args(annotation)
+            return typing.get_args(annotation)
 
         return (annotation,)
 
     def _parse_annotated(self) -> hikari.CommandOption | None:
-        parameter_type, *metadata = signatures.extract_args(self.current_parameter.annotation)
+        parameter_type, *metadata = typing.get_args(self.current_parameter.annotation)
 
         for meta in metadata:
             if not isinstance(meta, Option):
@@ -144,7 +144,7 @@ class SlashCommandExtractor:
         return None
 
     def _parse_union(self, annotation: object) -> hikari.CommandOption | None:
-        types = signatures.extract_args(annotation)
+        types = typing.get_args(annotation)
         inferred_type = self._infer_type(types)
 
         if inferred_type:
@@ -169,7 +169,7 @@ class SlashCommandExtractor:
 
     def extract(self) -> dict[str, hikari.CommandOption]:
         option_map: dict[str, hikari.CommandOption] = {}
-        signature = signatures.SignatureManager.get_signature(self.callback, cache=True)
+        signature = signatures.SignatureManager.get_signature(self.callback)
 
         for parameter in signature.parameters.values():
             if parameter.annotation is parameter.empty:

@@ -29,7 +29,7 @@ def _extract_provided_type(call: abc.Callable[..., object], annotation: object) 
     is_gen_fn = inspect.isgeneratorfunction(call) or inspect.isasyncgenfunction(call)
 
     if is_gen_type or is_gen_fn:
-        args = signatures.extract_args(annotation)
+        args = typing.get_args(annotation)
         target = args[0] if args else object
     else:
         target = annotation
@@ -131,10 +131,10 @@ class ParameterContext:
         annotation = self.parameter.annotation
 
         if signatures.is_annotated(annotation):
-            annotation = signatures.extract_args(annotation)[0]
+            annotation = typing.get_args(annotation)[0]
 
         if signatures.is_union(annotation) and (
-            type(None) in signatures.extract_args(annotation) or None in signatures.extract_args(annotation)
+            type(None) in typing.get_args(annotation) or None in typing.get_args(annotation)
         ):
             return True
 
@@ -206,7 +206,7 @@ class DependencyGraphValidator:
         raise errors.DependencyNotFoundError(self._call, self._current_parameter.parameter)
 
     def _validate_union(self) -> None:
-        types_in_union = signatures.extract_args(self._current_parameter.parameter_type)
+        types_in_union = typing.get_args(self._current_parameter.parameter_type)
         for type_ in types_in_union:
             try:
                 self._current_parameter.parameter_type = type_
@@ -217,7 +217,7 @@ class DependencyGraphValidator:
         raise errors.DependencyNotFoundError(self._call, self._current_parameter.parameter)
 
     def _validate_annotated(self) -> None:
-        param_type, *metadata = signatures.extract_args(self._current_parameter.parameter_type)
+        param_type, *metadata = typing.get_args(self._current_parameter.parameter_type)
         self._current_parameter.parameter_type = param_type
         for meta in metadata:
             if isinstance(meta, Dependency):
@@ -406,7 +406,7 @@ class Resolver:
         return result
 
     async def _resolve_annotated(self) -> None:
-        parameter_type, *metadata = signatures.extract_args(self._current_parameter.parameter_type)
+        parameter_type, *metadata = typing.get_args(self._current_parameter.parameter_type)
         for meta in metadata:
             if isinstance(meta, Dependency):
                 resolved_dependency = await self._resolve_dependency(meta)
@@ -419,7 +419,7 @@ class Resolver:
             await self._resolve_annotation()
 
     async def _resolve_union(self) -> None:
-        types_in_union = signatures.extract_args(self._current_parameter.parameter_type)
+        types_in_union = typing.get_args(self._current_parameter.parameter_type)
         for type_ in types_in_union:
             self._current_parameter.parameter_type = type_
             try:
@@ -518,7 +518,7 @@ class DependencyResolver:
     async def resolve(
         self, call: abc.Callable[..., typing.Any], *extra_args: object, **extra_kwargs: object
     ) -> Resolution:
-        signature = signatures.SignatureManager.get_signature(call, cache=True)
+        signature = signatures.SignatureManager.get_signature(call)
         return await Resolver(
             call,
             signature,
@@ -569,7 +569,7 @@ class DependencyManager:
         return self._container.remove_override(overridden)
 
     def validate(self, call: abc.Callable[..., typing.Any], lazy_types: set[type] | None = None) -> None:
-        signature = signatures.SignatureManager.get_signature(call, cache=True)
+        signature = signatures.SignatureManager.get_signature(call)
         DependencyGraphValidator(
             call,
             signature,
