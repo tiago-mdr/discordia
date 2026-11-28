@@ -1,4 +1,4 @@
-"""Decorator interface for registering Discord application interactions and components."""
+"""Decorator interface for registering Discord application interactions and interactions."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import typing
 import hikari
 from hikari.undefined import UNDEFINED
 
-from discordia.interactions import commands, components
+from discordia import interactions
 
 if typing.TYPE_CHECKING:
     from collections import abc
@@ -37,7 +37,7 @@ class InteractionDecorator:
         integration_types: hikari.UndefinedOr[abc.Sequence[hikari.ApplicationIntegrationType]] = UNDEFINED,
         context_types: hikari.UndefinedOr[abc.Sequence[hikari.ApplicationContextType]] = UNDEFINED,
         description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
-    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], commands.SlashCommand]:
+    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], interactions.SlashCommand]:
         """Declare a Discord application slash command.
 
         Args:
@@ -54,10 +54,10 @@ class InteractionDecorator:
             A decorator function returning the registered SlashCommand.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> commands.SlashCommand:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> interactions.SlashCommand:
             registers = self._owner.registers
             command_name = name or func.__name__
-            new_slash_command = commands.SlashCommand(
+            new_slash_command = interactions.SlashCommand(
                 name=command_name,
                 description=description,
                 default_member_permissions=default_member_permissions,
@@ -82,7 +82,7 @@ class InteractionDecorator:
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         integration_types: hikari.UndefinedOr[abc.Sequence[hikari.ApplicationIntegrationType]] = UNDEFINED,
         context_types: hikari.UndefinedOr[abc.Sequence[hikari.ApplicationContextType]] = UNDEFINED,
-    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], commands.UserMenu]:
+    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], interactions.UserMenu]:
         """Declare a user context menu interaction command.
 
         Args:
@@ -97,9 +97,9 @@ class InteractionDecorator:
             A decorator function returning the registered UserMenu.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> commands.UserMenu:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> interactions.UserMenu:
             registers = self._owner.registers
-            new_user_menu = commands.UserMenu(
+            new_user_menu = interactions.UserMenu(
                 callback=func,
                 name=name,
                 default_member_permissions=default_member_permissions,
@@ -122,7 +122,7 @@ class InteractionDecorator:
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         integration_types: hikari.UndefinedOr[abc.Sequence[hikari.ApplicationIntegrationType]] = UNDEFINED,
         context_types: hikari.UndefinedOr[abc.Sequence[hikari.ApplicationContextType]] = UNDEFINED,
-    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], commands.MessageMenu]:
+    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], interactions.MessageMenu]:
         """Declare a message context menu interaction command.
 
         Args:
@@ -137,9 +137,9 @@ class InteractionDecorator:
             A decorator function returning the registered MessageMenu.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> commands.MessageMenu:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> interactions.MessageMenu:
             registers = self._owner.registers
-            new_message_menu = commands.MessageMenu(
+            new_message_menu = interactions.MessageMenu(
                 callback=func,
                 name=name,
                 default_member_permissions=default_member_permissions,
@@ -153,7 +153,7 @@ class InteractionDecorator:
 
         return wrapper
 
-    def button(self, custom_id: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], components.Button]:
+    def button(self, custom_id: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], interactions.Button]:
         """Declare a callback for an interactive button component.
 
         Args:
@@ -163,9 +163,9 @@ class InteractionDecorator:
             A decorator function returning the registered Button.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> components.Button:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> interactions.Button:
             registers = self._owner.registers
-            new_button = components.Button(func, custom_id)
+            new_button = interactions.Button(func, custom_id)
             registers.buttons.add(new_button, self._owner)
             return new_button
 
@@ -175,7 +175,7 @@ class InteractionDecorator:
         self,
         custom_id: str,
         type: hikari.ComponentType = hikari.ComponentType.TEXT_SELECT_MENU,  # noqa: A002
-    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], components.SelectMenu]:
+    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], interactions.SelectMenu]:
         """Declare a callback for an interactive select menu component.
 
         Args:
@@ -186,15 +186,15 @@ class InteractionDecorator:
             A decorator function returning the registered SelectMenu.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> components.SelectMenu:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> interactions.SelectMenu:
             registers = self._owner.registers
-            new_select_menu = components.SelectMenu(func, custom_id, type)
+            new_select_menu = interactions.SelectMenu(func, custom_id, type)
             registers.select_menus.add(new_select_menu, self._owner)
             return new_select_menu
 
         return wrapper
 
-    def modal(self, custom_id: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], components.Modal]:
+    def modal(self, custom_id: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], interactions.Modal]:
         """Declare a callback for a modal form submit interaction.
 
         Args:
@@ -204,9 +204,9 @@ class InteractionDecorator:
             A decorator function returning the registered Modal.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> components.Modal:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> interactions.Modal:
             registers = self._owner.registers
-            new_modal = components.Modal(func, custom_id)
+            new_modal = interactions.Modal(func, custom_id)
             registers.modals.add(new_modal, self._owner)
             return new_modal
 

@@ -185,6 +185,19 @@ class TestEventRegistry:
         assert root_store.events[DMTypingEvent].callbacks == {dummy_typing_cb_2}
         assert dest_b.events[DMTypingEvent].callbacks == {dummy_typing_cb_1}
 
+    def test_unmerge_with_event_already_exists_at_the_destination(self) -> None:
+        mod_a = Module()
+        reg_a, reg_b = RegistryStore(), RegistryStore()
+
+        reg_a.events.add(EventResponder(DMTypingEvent, dummy_typing_cb_1), mod_a)
+        reg_b.events.add(EventResponder(DMTypingEvent, dummy_typing_cb_2), mod_a)
+
+        reg_a.unmerge(reg_a.events.get_registers(), reg_b)
+
+        assert reg_a.events.get(DMTypingEvent) is None
+        assert dummy_typing_cb_1 in reg_b.events[DMTypingEvent].callbacks
+        assert dummy_typing_cb_2 in reg_b.events[DMTypingEvent].callbacks
+
 
 class TestSpecializedRegistries:
     def test_slash_commands_registry(self) -> None:

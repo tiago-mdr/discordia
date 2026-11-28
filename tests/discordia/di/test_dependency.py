@@ -80,12 +80,12 @@ class TestDependencyCreation:
         dep_sync = inject(sample_func)
         assert isinstance(dep_sync, Dependency)
         assert dep_sync.return_type is str
-        assert dep_sync.call is sample_func
+        assert dep_sync.callback is sample_func
         assert "a" in dep_sync.signature.parameters
 
         dep_async = inject(async_sample_func)
         assert dep_async.return_type is int
-        assert dep_async.call is async_sample_func
+        assert dep_async.callback is async_sample_func
 
     def test_dependency_from_generator_and_iterator_annotations(self):
         def gen_func() -> Generator[int]:
@@ -116,7 +116,7 @@ class TestDependencyCreation:
 
         dep = inject(Service)
         assert dep.return_type is Service
-        assert dep.call is Service
+        assert dep.callback is Service
         assert "port" in dep.signature.parameters
 
     def test_dependency_from_callable_instance(self):
@@ -127,15 +127,15 @@ class TestDependencyCreation:
         invoker = Invoker()
         dep = inject(invoker)
         assert dep.return_type is bool
-        assert dep.call is invoker
+        assert dep.callback is invoker
 
     def test_dependency_from_non_callable_instance(self):
         raw_config = {"db_host": "localhost"}
         dep = inject(raw_config)
 
         assert dep.return_type is dict
-        assert callable(dep.call)
-        assert dep.call() == raw_config
+        assert callable(dep.callback)
+        assert dep.callback() == raw_config
 
     def test_return_type_normalizes_none_to_nonetype(self):
         def returns_none() -> None:
@@ -173,7 +173,7 @@ class TestDependencyContainerAndManagerRegistration:
         assert container.standard_dependencies[int].scope is _Scope.SCOPED
 
         removed = container.remove_dependency(int)
-        assert removed.call is get_port
+        assert removed.callback is get_port
         assert int not in container.standard_dependencies
 
     def test_duplicate_dependency_registration_raises_value_error(self):
@@ -205,7 +205,7 @@ class TestDependencyContainerAndManagerRegistration:
 
         manager.add_override(real_fn, mock_fn, "singleton")
         removed = manager.remove_override(real_fn)
-        assert removed.call is mock_fn
+        assert removed.callback is mock_fn
         assert removed.scope is _Scope.SINGLETON
 
     def test_duplicate_override_raises_value_error(self):

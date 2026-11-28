@@ -6,8 +6,7 @@ import typing
 
 from hikari import events
 
-from discordia import signatures
-from discordia.interactions import commands
+from discordia import interactions, signatures
 
 if typing.TYPE_CHECKING:
     from collections import abc
@@ -28,7 +27,7 @@ class EventDecorator:
 
     def listen[E: events.Event](
         self, event_type: type[E] | None = None
-    ) -> abc.Callable[[abc.Callable[typing.Concatenate[E, ...], abc.Awaitable[typing.Any]]], commands.EventResponder]:
+    ) -> abc.Callable[[abc.Callable[typing.Concatenate[E, ...], abc.Awaitable[object]]], interactions.EventResponder]:
         """Register an asynchronous callback to listen for a Discord gateway event.
 
         Args:
@@ -44,8 +43,8 @@ class EventDecorator:
         """
 
         def wrapper(
-            callback: abc.Callable[typing.Concatenate[E, ...], abc.Awaitable[typing.Any]],
-        ) -> commands.EventResponder:
+            callback: abc.Callable[typing.Concatenate[E, ...], abc.Awaitable[object]],
+        ) -> interactions.EventResponder:
             infered_event = event_type or signatures.find_for_type(callback, events.Event)
             if infered_event is None:
                 msg = (
@@ -54,7 +53,7 @@ class EventDecorator:
                 )
                 raise TypeError(msg)
 
-            event_responder = commands.EventResponder(infered_event, callback)
+            event_responder = interactions.EventResponder(infered_event, callback)
             self._owner.registers.events.add(event_responder, self._owner)
             return event_responder
 

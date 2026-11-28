@@ -1,4 +1,4 @@
-"""Button message component interaction responder."""
+"""Modal dialog interaction responder."""
 
 from __future__ import annotations
 
@@ -8,23 +8,23 @@ import attrs
 import hikari
 
 if typing.TYPE_CHECKING:
-    from collections import abc
+    from collections.abc import Awaitable, Callable
 
     from discordia import di
 
 
 @attrs.define()
-class Button:
-    """Represents an interactive button message component responder."""
+class Modal:
+    """Represents a modal submit interaction responder."""
 
-    callback: abc.Callable[..., abc.Awaitable[typing.Any]] = attrs.field()
-    """Callable executed when the button is pressed."""
+    callback: Callable[..., Awaitable[object]] = attrs.field()
+    """Callable executed when the modal form is submitted."""
 
     custom_id: str = attrs.field()
-    """Unique string identifying the button component."""
+    """Unique string identifying the modal component."""
 
     def validate(self, validator: di.DependencyManager) -> None:
-        """Validate parameter dependencies for the button callback.
+        """Validate parameter dependencies for the modal callback.
 
         Args:
             validator: The DependencyManager used to validate dependencies.

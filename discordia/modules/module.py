@@ -98,9 +98,7 @@ class Module:
 
     def catch_error[Error: Exception](
         self, error: type[Error] | None = None
-    ) -> typing.Callable[
-        [typing.Callable[typing.Concatenate[Error, ...], Awaitable[typing.Any]]], handlers.ErrorResponder
-    ]:
+    ) -> typing.Callable[[typing.Callable[typing.Concatenate[Error, ...], Awaitable[object]]], handlers.ErrorResponder]:
         """Register a callback to handle specific exception types.
 
         Args:
@@ -115,7 +113,7 @@ class Module:
         """
 
         def wrapper(
-            func: typing.Callable[typing.Concatenate[Error, ...], Awaitable[typing.Any]],
+            func: typing.Callable[typing.Concatenate[Error, ...], Awaitable[object]],
         ) -> handlers.ErrorResponder:
             inferred_error = error or signatures.find_for_type(func, Exception)
             if inferred_error is None:

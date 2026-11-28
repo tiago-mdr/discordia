@@ -1,4 +1,4 @@
-"""Registries for storing Discordia components and events."""
+"""Registries for storing Discordia interactions and events."""
 
 from __future__ import annotations
 
@@ -8,8 +8,7 @@ from collections import abc
 import attrs
 import hikari
 
-from discordia import handlers
-from discordia.interactions import commands, components
+from discordia import handlers, interactions
 
 if typing.TYPE_CHECKING:
     from discordia.modules.module import Module
@@ -109,11 +108,11 @@ class Registry[K: abc.Hashable, D]:
         """
         return tuple(self._data.values())
 
-    def merge(self, registers: abc.Sequence[RegistrationData[D]]) -> None:
+    def merge(self, registers: abc.Iterable[RegistrationData[D]]) -> None:
         """Merge a sequence of registration items into this registry.
 
         Args:
-            registers: Sequence of RegistrationData entries to merge.
+            registers: Itarable of RegistrationData entries to merge.
         """
         for register in registers:
             self.add_register(register)
@@ -144,13 +143,13 @@ class Registry[K: abc.Hashable, D]:
             yield register.data
 
 
-class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
+class EventRegistry(Registry[type[hikari.Event], interactions.EventResponder]):
     """Registry for Discord event responders."""
 
     def __init__(self) -> None:
         super().__init__("event", lambda i: i.event)
 
-    def add(self, item: commands.EventResponder, owner: Module) -> None:
+    def add(self, item: interactions.EventResponder, owner: Module) -> None:
         """Add an event responder.
 
         Args:
@@ -166,25 +165,25 @@ class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
         registered = RegistrationData(owner, item)
         owner.metadata.add_register(registered)
 
-    def merge(self, registers: typing.Sequence[RegistrationData[commands.EventResponder]]) -> None:
+    def merge(self, registers: abc.Iterable[RegistrationData[interactions.EventResponder]]) -> None:
         """Merge a sequence of event responders.
 
         Args:
-            registers: Sequence of event responder registrations to merge.
+            registers: Iterable of event responder registrations to merge.
         """
         for register in registers:
             data = register.data
             if data.event in self._data:
                 self._data[data.event].data.callbacks.update(data.callbacks)
             else:
-                new_responder = commands.EventResponder(data.event)
+                new_responder = interactions.EventResponder(data.event)
                 new_responder.callbacks = set(data.callbacks)
                 self._data[data.event] = RegistrationData(register.owner, new_responder)
 
     def unmerge(
         self,
-        item: RegistrationData[commands.EventResponder],
-        destination: Registry[type[hikari.Event], commands.EventResponder],
+        item: RegistrationData[interactions.EventResponder],
+        destination: Registry[type[hikari.Event], interactions.EventResponder],
     ) -> None:
         """Unmerge an event responder.
 
@@ -193,53 +192,53 @@ class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
             destination: The target registry where the unmerged responder will reside.
         """
         data = item.data
-        if data.event in self._data:
-            self._data[data.event].data.callbacks.difference_update(data.callbacks)
-            if not self._data[data.event].data.callbacks:
-                del self._data[data.event]
-
         if data.event in destination:
             destination[data.event].callbacks.update(data.callbacks)
         else:
             destination.add_register(item)
 
+        if data.event in self._data:
+            self._data[data.event].data.callbacks.difference_update(data.callbacks)
+            if not self._data[data.event].data.callbacks:
+                del self._data[data.event]
 
-class SlashCommandRegistry(Registry[str, commands.SlashCommand]):
-    """Registry for Discord application slash commands."""
+
+class SlashCommandRegistry(Registry[str, interactions.SlashCommand]):
+    """Registry for Discord application slash interactions."""
 
     def __init__(self) -> None:
         super().__init__("slash command", lambda i: i.name)
 
 
-class UserMenuRegistry(Registry[str, commands.UserMenu]):
-    """Registry for user context menu commands."""
+class UserMenuRegistry(Registry[str, interactions.UserMenu]):
+    """Registry for user context menu interactions."""
 
     def __init__(self) -> None:
         super().__init__("user menu", lambda i: i.name)
 
 
-class MessageMenuRegistry(Registry[str, commands.MessageMenu]):
-    """Registry for message context menu commands."""
+class MessageMenuRegistry(Registry[str, interactions.MessageMenu]):
+    """Registry for message context menu interactions."""
 
     def __init__(self) -> None:
         super().__init__("message menu", lambda i: i.name)
 
 
-class ButtonRegistry(Registry[str, components.Button]):
-    """Registry for interactive button components."""
+class ButtonRegistry(Registry[str, interactions.Button]):
+    """Registry for interactive button interactions."""
 
     def __init__(self) -> None:
         super().__init__("button", lambda i: i.custom_id)
 
 
-class SelectMenuRegistry(Registry[str, components.SelectMenu]):
-    """Registry for interactive select menu components."""
+class SelectMenuRegistry(Registry[str, interactions.SelectMenu]):
+    """Registry for interactive select menu interactions."""
 
     def __init__(self) -> None:
         super().__init__("select menu", lambda i: i.custom_id)
 
 
-class ModalRegistry(Registry[str, components.Modal]):
+class ModalRegistry(Registry[str, interactions.Modal]):
     """Registry for modal form submit interactions."""
 
     def __init__(self) -> None:

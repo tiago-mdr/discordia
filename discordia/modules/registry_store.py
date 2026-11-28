@@ -6,8 +6,7 @@ import typing
 
 import attrs
 
-from discordia import handlers
-from discordia.interactions import commands, components, event
+from discordia import handlers, interactions
 from discordia.modules import registries
 
 
@@ -29,13 +28,13 @@ class RegistryStore:
     def __attrs_post_init__(self) -> None:
         """Map supported interaction and handler types to their dedicated registries."""
         self._map = {
-            commands.SlashCommand: self.slash_commands,
-            commands.UserMenu: self.user_menus,
-            commands.MessageMenu: self.message_menus,
-            components.Button: self.buttons,
-            components.SelectMenu: self.select_menus,
-            components.Modal: self.modals,
-            event.EventResponder: self.events,
+            interactions.SlashCommand: self.slash_commands,
+            interactions.UserMenu: self.user_menus,
+            interactions.MessageMenu: self.message_menus,
+            interactions.Button: self.buttons,
+            interactions.SelectMenu: self.select_menus,
+            interactions.Modal: self.modals,
+            interactions.EventResponder: self.events,
             handlers.ErrorResponder: self.errors,
         }
 
@@ -49,11 +48,13 @@ class RegistryStore:
             other_registry = other._map[data_type]
             my_registry.merge(other_registry.get_registers())
 
-    def unmerge(self, registries: set[registries.RegistrationData[typing.Any]], destination: RegistryStore) -> None:
+    def unmerge(
+        self, registries: typing.Iterable[registries.RegistrationData[typing.Any]], destination: RegistryStore
+    ) -> None:
         """Unmerge specified registration items from this store into a destination store.
 
         Args:
-            registries: Set of registration items to remove from this store.
+            registries: Iterable of registration items to remove from this store.
             destination: Target RegistryStore to receive the unmerged registrations.
 
         Raises:

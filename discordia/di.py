@@ -22,7 +22,7 @@ type _ScopeAlias = typing.Literal["singleton", "scoped", "transient"]
 type _GenericGenerator = abc.Generator[typing.Any, typing.Any, typing.Any] | abc.AsyncGenerator[typing.Any, typing.Any]
 
 
-def _extract_provided_type(call: abc.Callable[..., object], annotation: object) -> type:
+def _extract_provided_type(function: abc.Callable[..., object], annotation: object) -> type:
     """Extract the underlying provided type from a return annotation, unpacking generators."""
     origin = typing.get_origin(annotation)
     is_gen_type = origin in (
@@ -31,7 +31,7 @@ def _extract_provided_type(call: abc.Callable[..., object], annotation: object) 
         abc.Iterator,
         abc.AsyncIterator,
     )
-    is_gen_fn = inspect.isgeneratorfunction(call) or inspect.isasyncgenfunction(call)
+    is_gen_fn = inspect.isgeneratorfunction(function) or inspect.isasyncgenfunction(function)
 
     if is_gen_type or is_gen_fn:
         args = typing.get_args(annotation)
@@ -63,28 +63,28 @@ class Dependency:
             msg = f"Abstract classes cannot be used as dependencies: {dependency}"
             raise ValueError(msg)
 
-        self.call: abc.Callable[..., object]
+        self.callback: abc.Callable[..., object]
         self.return_type: type
         self.scope = scope
 
         if inspect.isclass(dependency):
-            self.call = dependency
+            self.callback = dependency
             self.return_type = dependency
         elif callable(dependency):
-            self.call = dependency
+            self.callback = dependency
         else:
-            self.call = lambda: dependency
-            self.call.__annotations__["return"] = type(dependency)
+            self.callback = lambda: dependency
+            self.callback.__annotations__["return"] = type(dependency)
 
-        self.signature = signatures.SignatureManager.get_signature(self.call)
+        self.signature = signatures.SignatureManager.get_signature(self.callback)
         if not inspect.isclass(dependency):
             if self.signature.return_annotation is inspect.Parameter.empty:
                 msg = "Dependency callables must define a return type annotation"
                 raise ValueError(msg)
-            self.return_type = _extract_provided_type(self.call, self.signature.return_annotation)
+            self.return_type = _extract_provided_type(self.callback, self.signature.return_annotation)
 
     def __repr__(self) -> str:
-        name = getattr(self.call, "__name__", repr(self.call))
+        name = getattr(self.callback, "__name__", repr(self.callback))
         return f'Dependency({name}, "{self.scope.name}")'
 
 
@@ -232,7 +232,7 @@ class DependencyGraphValidator:
 
     def __init__(
         self,
-        call: abc.Callable[..., object],
+        func: abc.Callable[..., object],
         signature: inspect.Signature,
         container: DependencyContainer,
         lazy_types: set[type],
@@ -243,14 +243,14 @@ class DependencyGraphValidator:
         """Initialize the dependency graph validator.
 
         Args:
-            call: The root callable to validate.
+            func: The root callable to validate.
             signature: The resolved signature of the callable.
             container: The container providing registered dependency definitions.
             lazy_types: Set of types deferred to runtime.
             call_stack: Recursion stack tracking callbacks in the current branch.
             in_singleton: Whether the validation branch originated from a singleton scope.
         """
-        self._call = call
+        self._func = func
         self._signature = signature
         self._container = container
         self._lazy_types = lazy_types
@@ -262,11 +262,11 @@ class DependencyGraphValidator:
         in_singleton = self._in_singleton or dependency.scope is _Scope.SINGLETON
 
         if in_singleton and dependency.scope is not _Scope.SINGLETON:
-            raise errors.ScopeError(self._call, self._current_parameter.parameter)
+            raise errors.ScopeError(self._func, self._current_parameter.parameter)
 
         try:
             DependencyGraphValidator(
-                dependency.call,
+                dependency.callback,
                 dependency.signature,
                 self._container,
                 self._lazy_types,
@@ -277,7 +277,7 @@ class DependencyGraphValidator:
             if signatures.is_equals(dependency.return_type, self._current_parameter.parameter_type):
                 self._current_parameter.is_resolved = True
         except errors.DependencyError as error:
-            error.add_path(self._call, self._current_parameter.parameter)
+            error.add_path(self._func, self._current_parameter.parameter)
             raise
 
     def _validate_parameter_type(self) -> None:
@@ -294,7 +294,7 @@ class DependencyGraphValidator:
                 if cls in self._lazy_types:
                     return
 
-        raise errors.DependencyNotFoundError(self._call, self._current_parameter.parameter)
+        raise errors.DependencyNotFoundError(self._func, self._current_parameter.parameter)
 
     def _validate_union(self) -> None:
         types_in_union = typing.get_args(self._current_parameter.parameter_type)
@@ -305,7 +305,7 @@ class DependencyGraphValidator:
             except errors.DependencyNotFoundError:
                 continue
             return
-        raise errors.DependencyNotFoundError(self._call, self._current_parameter.parameter)
+        raise errors.DependencyNotFoundError(self._func, self._current_parameter.parameter)
 
     def _validate_annotated(self) -> None:
         param_type, *metadata = typing.get_args(self._current_parameter.parameter_type)
@@ -346,15 +346,12 @@ class DependencyGraphValidator:
             DependencyNotFoundError: If a parameter dependency cannot be resolved.
             ScopeError: If a singleton provider depends on a scoped or transient dependency.
         """
-        if self._call in self._call_stack:
-            raise errors.CircularDependencyError(self._call)
-
-        self._call_stack.append(self._call)
+        self._call_stack.append(self._func)
         try:
             for parameter in self._signature.parameters.values():
                 self._current_parameter = ParameterContext(parameter)
                 if not self._current_parameter.has_annotation:
-                    raise errors.MissingAnnotationError(self._call, self._current_parameter.parameter)
+                    raise errors.MissingAnnotationError(self._func, self._current_parameter.parameter)
 
                 if parameter.kind is parameter.VAR_POSITIONAL or parameter.kind is parameter.VAR_KEYWORD:
                     continue
@@ -409,7 +406,7 @@ class Resolver:
 
     def __init__(
         self,
-        call: abc.Callable[..., object],
+        func: abc.Callable[..., object],
         signature: inspect.Signature,
         container: DependencyContainer,
         *extra_args: object,
@@ -423,7 +420,7 @@ class Resolver:
         """Initialize the invocation resolver.
 
         Args:
-            call: The callable to resolve dependencies for.
+            func: The callable to resolve dependencies for.
             signature: The resolved signature of the callable.
             container: The dependency container holding providers and overrides.
             *extra_args: Runtime positional values to match by type.
@@ -434,7 +431,7 @@ class Resolver:
             scoped_generators: Scoped generators to close after the current execution.
             **extra_kwargs: Runtime keyword values to match by parameter name.
         """
-        self._call = call
+        self._func = func
         self._signature = signature
         self._container = container
         self._call_stack = [] if call_stack is None else call_stack
@@ -462,32 +459,32 @@ class Resolver:
         self._current_parameter.is_resolved = True
 
     def _store_resolved_dependency(
-        self, call: abc.Callable[..., typing.Any], resolved_dependency: object, scope: _Scope
+        self, func: abc.Callable[..., typing.Any], resolved_dependency: object, scope: _Scope
     ) -> None:
         if resolved_dependency is None:
             return
 
         match scope:
             case _Scope.SINGLETON:
-                self._singleton_instances[call] = resolved_dependency
+                self._singleton_instances[func] = resolved_dependency
             case _Scope.SCOPED:
-                self._scoped_instances[call] = resolved_dependency
+                self._scoped_instances[func] = resolved_dependency
             case _Scope.TRANSIENT:
                 pass
 
     async def _resolve_dependency(self, dependency: Dependency) -> object:
-        if dependency.scope is _Scope.SINGLETON and dependency.call in self._singleton_instances:
-            return self._singleton_instances[dependency.call]
+        if dependency.scope is _Scope.SINGLETON and dependency.callback in self._singleton_instances:
+            return self._singleton_instances[dependency.callback]
 
-        if dependency.scope is _Scope.SCOPED and dependency.call in self._scoped_instances:
-            return self._scoped_instances[dependency.call]
+        if dependency.scope is _Scope.SCOPED and dependency.callback in self._scoped_instances:
+            return self._scoped_instances[dependency.callback]
 
-        if dependency.call in self._container.overrides:
-            dependency = self._container.overrides[dependency.call]
+        if dependency.callback in self._container.overrides:
+            dependency = self._container.overrides[dependency.callback]
 
         try:
             dependency_resolution = await Resolver(
-                dependency.call,
+                dependency.callback,
                 dependency.signature,
                 self._container,
                 *self._extra_args,
@@ -502,12 +499,12 @@ class Resolver:
             self._transient_generators.extend(dependency_resolution.transient_generators)
             result = await self._execute_dependency(dependency, dependency_resolution)
         except errors.DependencyError as error:
-            error.add_path(self._call, self._current_parameter.parameter)
+            error.add_path(self._func, self._current_parameter.parameter)
             raise
         return result
 
     async def _execute_dependency(self, dependency: Dependency, resolution: Resolution) -> object:
-        callback = dependency.call
+        callback = dependency.callback
         generator: abc.AsyncGenerator[typing.Any, typing.Any] | abc.Generator[typing.Any, typing.Any] | None = None
 
         if inspect.iscoroutinefunction(callback):
@@ -530,7 +527,7 @@ class Resolver:
                 case _Scope.TRANSIENT:
                     self._transient_generators.append(generator)
 
-        self._store_resolved_dependency(dependency.call, result, dependency.scope)
+        self._store_resolved_dependency(dependency.callback, result, dependency.scope)
         return result
 
     async def _resolve_annotated(self) -> None:
@@ -557,7 +554,7 @@ class Resolver:
                 continue
 
         if not self._current_parameter.is_resolved:
-            raise errors.DependencyNotFoundError(self._call, self._current_parameter.parameter)
+            raise errors.DependencyNotFoundError(self._func, self._current_parameter.parameter)
 
     async def _resolve_type(self) -> None:
         if self._current_parameter.parameter.name in self._extra_kwargs:
@@ -574,7 +571,7 @@ class Resolver:
             resolved_dependency = await self._resolve_dependency(stantard_dependency)
             self._add_resolved(resolved_dependency)
             self._store_resolved_dependency(
-                stantard_dependency.call,
+                stantard_dependency.callback,
                 resolved_dependency,
                 stantard_dependency.scope,
             )
@@ -586,7 +583,7 @@ class Resolver:
         ):
             return
 
-        raise errors.DependencyNotFoundError(self._call, self._current_parameter.parameter)
+        raise errors.DependencyNotFoundError(self._func, self._current_parameter.parameter)
 
     async def _resolve_annotation(self) -> None:
         try:
@@ -621,16 +618,16 @@ class Resolver:
             MissingAnnotationError: If a parameter lacks an annotation.
             DependencyNotFoundError: If a required dependency cannot be satisfied.
         """
-        if self._call in self._call_stack:
-            raise errors.CircularDependencyError(self._call)
+        if self._func in self._call_stack:
+            raise errors.CircularDependencyError(self._func)
 
-        self._call_stack.append(self._call)
+        self._call_stack.append(self._func)
         try:
             for parameter in self._signature.parameters.values():
                 self._current_parameter = ParameterContext(parameter)
 
                 if not self._current_parameter.has_annotation:
-                    raise errors.MissingAnnotationError(self._call, parameter)
+                    raise errors.MissingAnnotationError(self._func, parameter)
 
                 await self._resolve_annotation()
         except errors.DependencyError:
@@ -661,21 +658,21 @@ class DependencyResolver:
         self._singleton_generators: list[_GenericGenerator] = []
 
     async def resolve(
-        self, call: abc.Callable[..., typing.Any], *extra_args: object, **extra_kwargs: object
+        self, func: abc.Callable[..., typing.Any], *extra_args: object, **extra_kwargs: object
     ) -> Resolution:
         """Resolve all dependencies for a callable.
 
         Args:
-            call: The callable to resolve dependencies for.
+            func: The callable to resolve dependencies for.
             *extra_args: Positional runtime values passed to the invocation.
             **extra_kwargs: Keyword runtime values passed to the invocation.
 
         Returns:
             A Resolution object containing resolved arguments and generator hooks.
         """
-        signature = signatures.SignatureManager.get_signature(call)
+        signature = signatures.SignatureManager.get_signature(func)
         return await Resolver(
-            call,
+            func,
             signature,
             self._container,
             *extra_args,
@@ -687,25 +684,25 @@ class DependencyResolver:
             **extra_kwargs,
         ).resolve()
 
-    async def execute[T](self, call: abc.Callable[..., T], *extra_args: object, **extra_kwargs: object) -> T:
+    async def execute[T](self, func: abc.Callable[..., T], *extra_args: object, **extra_kwargs: object) -> T:
         """Execute a callable and return its result.
 
         This function will resolve dependencies, execute the callable and close the generators.
 
         Args:
-            call: The synchronous or asynchronous callable to execute.
-            *extra_args: Positional runtime values to inject into the call.
-            **extra_kwargs: Keyword runtime values to inject into the call.
+            func: The synchronous or asynchronous callable to execute.
+            *extra_args: Positional runtime values to inject into the func.
+            **extra_kwargs: Keyword runtime values to inject into the func.
 
         Returns:
             The return value of the executed callable.
         """
-        resolution = await self.resolve(call, *extra_args, **extra_kwargs)
+        resolution = await self.resolve(func, *extra_args, **extra_kwargs)
         try:
-            if inspect.iscoroutinefunction(call):
-                return await call(*resolution.args, **resolution.kwargs)
+            if inspect.iscoroutinefunction(func):
+                return await func(*resolution.args, **resolution.kwargs)
 
-            return call(*resolution.args, **resolution.kwargs)
+            return func(*resolution.args, **resolution.kwargs)
         finally:
             await resolution.finish()
 
@@ -721,11 +718,11 @@ class DependencyManager(DependencyContainer, DependencyResolver):
         DependencyContainer.__init__(self)
         DependencyResolver.__init__(self, self)
 
-    def validate(self, call: abc.Callable[..., typing.Any], lazy_types: set[type] | None = None) -> None:
+    def validate(self, func: abc.Callable[..., typing.Any], lazy_types: set[type] | None = None) -> None:
         """Statically validate that all dependencies for a callable can be resolved.
 
         Args:
-            call: The callable to validate.
+            func: The callable to validate.
             lazy_types: Optional set of types deferred to runtime.
 
         Raises:
@@ -734,9 +731,9 @@ class DependencyManager(DependencyContainer, DependencyResolver):
             DependencyNotFoundError: If a required dependency cannot be satisfied.
             ScopeError: If a singleton provider depends on a scoped/transient dependency.
         """
-        signature = signatures.SignatureManager.get_signature(call)
+        signature = signatures.SignatureManager.get_signature(func)
         DependencyGraphValidator(
-            call,
+            func,
             signature,
             self._container,
             lazy_types or set(),

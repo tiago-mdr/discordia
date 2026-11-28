@@ -229,7 +229,7 @@ class SlashCommandExtractor:
 class SlashCommandParsed:
     """Represents the parsed execution target and arguments for a slash command."""
 
-    callback: abc.Callable[..., abc.Awaitable[typing.Any]] = attrs.field()
+    callback: abc.Callable[..., abc.Awaitable[object]] = attrs.field()
     """Asynchronous callback function to invoke."""
 
     data: dict[str, object] = attrs.field()
@@ -240,10 +240,10 @@ class SlashCommandParsed:
 class SlashCommandResponder:
     """Manages the response flow for slash commands and their autocompletes."""
 
-    callback: abc.Callable[..., abc.Awaitable[typing.Any]] = attrs.field()
+    callback: abc.Callable[..., abc.Awaitable[object]] = attrs.field()
     option_map: dict[str, hikari.CommandOption] = attrs.field(init=False)
-    autocomplete: dict[str, abc.Callable[..., abc.Awaitable[typing.Any]]] = attrs.field(
-        factory=dict[str, abc.Callable[..., abc.Awaitable[typing.Any]]], init=False
+    autocomplete: dict[str, abc.Callable[..., abc.Awaitable[object]]] = attrs.field(
+        factory=dict[str, abc.Callable[..., abc.Awaitable[object]]], init=False
     )
 
     def __attrs_post_init__(self) -> None:
@@ -411,7 +411,7 @@ class SubCommand:
         msg = f'Subcommand "{self.name}" does not have a registered responder callback.'
         raise ValueError(msg)
 
-    def responder(self, func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
+    def responder(self, func: abc.Callable[..., abc.Awaitable[object]]) -> typing.Self:
         """Set the handler callback for this subcommand.
 
         Args:
@@ -431,7 +431,7 @@ class SubCommand:
         """
         self.get_responder().validate(validator)
 
-    def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], typing.Self]:
+    def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], typing.Self]:
         """Register an autocomplete handler for a specific option of this subcommand.
 
         Args:
@@ -441,7 +441,7 @@ class SubCommand:
             A decorator function returning self.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> typing.Self:
             responder = self.get_responder()
             responder.autocomplete[name] = func
             return self
@@ -525,7 +525,7 @@ class SubCommandGroup:
         description: str = "...",
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
-    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], SubCommand]:
+    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], SubCommand]:
         """Declare a nested subcommand within this group.
 
         Args:
@@ -538,7 +538,7 @@ class SubCommandGroup:
             A decorator returning the created SubCommand instance.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> SubCommand:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> SubCommand:
             subcommand_name = name or func.__name__
             subcommand = SubCommand(
                 subcommand_name,
@@ -677,7 +677,7 @@ class SlashCommand:
     _subcommands_group: dict[str, SubCommandGroup] = attrs.field(factory=dict[str, SubCommandGroup], init=False)
     _responder: SlashCommandResponder | None = attrs.field(default=None, init=False)
 
-    def responder(self, func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
+    def responder(self, func: abc.Callable[..., abc.Awaitable[object]]) -> typing.Self:
         """Set the top-level handler callback for this slash command.
 
         Args:
@@ -689,7 +689,7 @@ class SlashCommand:
         self._responder = SlashCommandResponder(func)
         return self
 
-    def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], typing.Self]:
+    def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], typing.Self]:
         """Register an autocomplete handler for a top-level option.
 
         Args:
@@ -699,7 +699,7 @@ class SlashCommand:
             A decorator function returning self.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> typing.Self:
             responder = self.get_responder()
             responder.autocomplete[name] = func
             return self
@@ -774,7 +774,7 @@ class SlashCommand:
         description: str = "...",
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
-    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], SubCommand]:
+    ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[object]]], SubCommand]:
         """Declare a direct subcommand under this slash command.
 
         Args:
@@ -787,7 +787,7 @@ class SlashCommand:
             A decorator returning the created SubCommand instance.
         """
 
-        def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> SubCommand:
+        def wrapper(func: abc.Callable[..., abc.Awaitable[object]]) -> SubCommand:
             subcommand = SubCommand(
                 name,
                 description=description,

@@ -117,8 +117,7 @@ def _get_callable_globals(fn: abc.Callable[..., object]) -> dict[str, typing.Any
 class SecureResolver:
     """An object that safely resolves function signatures without falling into recursion cycles."""
 
-    _call_stack: list[abc.Callable[..., typing.Any]] = []  # noqa: RUF012
-    _func_stack = _call_stack
+    _func_stack: list[abc.Callable[..., typing.Any]] = []  # noqa: RUF012
 
     def __init__(self, func: abc.Callable[..., typing.Any]) -> None:
         """Initialize the resolver.

@@ -19,7 +19,7 @@ class ErrorResponder:
     error: type[Exception] = attrs.field()
     """The specific Exception class to catch and handle."""
 
-    callback: typing.Callable[..., abc.Awaitable[typing.Any]] = attrs.field()
+    callback: typing.Callable[..., abc.Awaitable[object]] = attrs.field()
     """Callable invoked when the mapped exception is caught."""
 
     def validate(self, validator: di.DependencyManager) -> None:

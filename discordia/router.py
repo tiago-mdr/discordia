@@ -12,7 +12,7 @@ if typing.TYPE_CHECKING:
     from hikari.api import EventManager
 
     from discordia.di import DependencyManager
-    from discordia.interactions.components.modal import Modal
+    from discordia.interactions.modal import Modal
     from discordia.modules import registry_store
 
 
