@@ -1,3 +1,5 @@
+"""Modular architecture supporting composable module trees, registries, and decorators."""
+
 from __future__ import annotations
 
 import typing
@@ -12,7 +14,14 @@ if typing.TYPE_CHECKING:
 
 
 class ModuleMetaData:
+    """Stores family data and registries in a module."""
+
     def __init__(self, module: Module) -> None:
+        """Initialize metadata for a module.
+
+        Args:
+            module: The module being configured.
+        """
         self.module = module
         self.children: set[Module] = set()
         self.owner: Module | None = None
@@ -22,6 +31,7 @@ class ModuleMetaData:
 
     @property
     def root(self) -> Module:
+        """The top-most ancestor module in the hierarchy."""
         while self._root.metadata.owner is not None:
             self._root = self._root.metadata.owner
         return self._root
@@ -32,6 +42,7 @@ class ModuleMetaData:
 
     @property
     def family(self) -> set[Module]:
+        """All modules that belong to the current tree hierarchy."""
         if self.root is self.module:
             return self._family
 
@@ -42,23 +53,42 @@ class ModuleMetaData:
         self._family = other
 
     def get_registers(self) -> set[RegistrationData[typing.Any]]:
+        """Return all registrations declared directly by this module.
+
+        Returns:
+            A set of RegistrationData instances owned by this module.
+        """
         return self._my_registers
 
     def add_register(self, new: RegistrationData[typing.Any]) -> None:
+        """Track a new registration owned by this module.
+
+        Args:
+            new: The registration data wrapper to add.
+        """
         self._my_registers.add(new)
 
     def remove_register(self, register: RegistrationData[typing.Any]) -> None:
+        """Untrack a registration owned by this module.
+
+        Args:
+            register: The registration data wrapper to remove.
+        """
         self._my_registers.discard(register)
 
 
 class Module:
+    """Composable container for handlers."""
+
     def __init__(self) -> None:
+        """Initialize an empty module instance."""
         self._registers = registry_store.RegistryStore()
         self.metadata = ModuleMetaData(self)
         self.events = decorators.EventDecorator(self)
         self.interactions = decorators.InteractionDecorator(self)
 
     def _is_descendant(self, other: Module) -> bool:
+        """Check whether another module is a direct or indirect descendant of this module."""
         curr = other.metadata.owner
         while curr is not None:
             if curr is self:
@@ -71,6 +101,19 @@ class Module:
     ) -> typing.Callable[
         [typing.Callable[typing.Concatenate[Error, ...], Awaitable[typing.Any]]], handlers.ErrorResponder
     ]:
+        """Register a callback to handle specific exception types.
+
+        Args:
+            error: The Exception type to catch. If omitted, the type is inferred from
+                the first parameter annotation of the decorated callback.
+
+        Returns:
+            A decorator function returning the registered ErrorResponder.
+
+        Raises:
+            ValueError: If error is not provided and cannot be inferred from the callback signature.
+        """
+
         def wrapper(
             func: typing.Callable[typing.Concatenate[Error, ...], Awaitable[typing.Any]],
         ) -> handlers.ErrorResponder:
@@ -87,6 +130,7 @@ class Module:
 
     @property
     def registers(self) -> registry_store.RegistryStore:
+        """The RegistryStore of the hierarchy."""
         root = self.metadata.root
 
         if root is self:
@@ -98,6 +142,15 @@ class Module:
         self._registers = other
 
     def merge(self, other: Module) -> None:
+        """Merge another module into this module.
+
+        Args:
+            other: The child module to attach.
+
+        Raises:
+            ModuleMergeError: If attempting to merge a module into itself, if the module
+                already has an owner, or if it is already in the tree.
+        """
         if other is self:
             msg = "Cannot merge a module into itself."
             raise errors.ModuleMergeError(msg)
@@ -129,6 +182,15 @@ class Module:
         other.metadata.family = root.metadata.family
 
     def unmerge(self, other: Module) -> None:
+        """Detach a descendant module from this module hierarchy.
+
+        Args:
+            other: The descendant module to detach.
+
+        Raises:
+            ModuleUnmergeError: If attempting to unmerge self or a module that is
+                not a descendant of this module.
+        """
         if other is self:
             msg = "Cannot unmerge a module from itself."
             raise errors.ModuleUnmergeError(msg)

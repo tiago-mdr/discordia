@@ -44,7 +44,8 @@ line-ending = "lf"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D", # docstring (temporary)
+    "D105",    # Missing docstring in magic method
+    "D107",    # Missing docstring in `__init__`
     "CPY001", # missing copyright notice (temporary)
     "S101",   # use of assert
     "COM812",  # missing trailing comma (conflict with the formatter)
@@ -53,6 +54,9 @@ ignore = [
     "PLR0912", # too many branches (consider remove in future)
     "PLR0913" # too many arguments
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [

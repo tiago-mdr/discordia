@@ -1,3 +1,5 @@
+"""Modularization system and registry storage for Discordia."""
+
 from .decorators import EventDecorator, InteractionDecorator
 from .module import Module, ModuleMetaData
 from .registries import Registry

@@ -1,3 +1,5 @@
+"""Discord application commands including slash commands and context menus."""
+
 from discordia.interactions.event import EventResponder
 
 from .message_menu import MessageMenu

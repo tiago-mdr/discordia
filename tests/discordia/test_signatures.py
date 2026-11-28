@@ -344,7 +344,7 @@ class TestSecureResolver:
         assert err.path[0].parameter.name == "a"
         assert err.path[1].callback is mutual_cycle_a
         assert err.path[1].parameter.name == "b"
-        assert SecureResolver._call_stack == []
+        assert SecureResolver._func_stack == []
 
 
 class TestSignatureManager:

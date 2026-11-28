@@ -1,3 +1,5 @@
+"""Registries for storing Discordia components and events."""
+
 from __future__ import annotations
 
 import typing
@@ -15,17 +17,33 @@ if typing.TYPE_CHECKING:
 
 @attrs.frozen()
 class RegistrationData[T]:
+    """Representation of a registered item."""
+
     owner: Module = attrs.field()
+    """The module that registered and owns this item."""
+
     data: T = attrs.field(hash=False)
+    """The registered data"""
 
 
 @attrs.define()
 class Registry[K: abc.Hashable, D]:
+    """Generic registry that stores items."""
+
     _name: str = attrs.field()
     _get_key: abc.Callable[[D], K] = attrs.field(repr=False)
     _data: dict[K, RegistrationData[D]] = attrs.field(factory=dict[K, RegistrationData[D]])
 
     def add(self, item: D, owner: Module) -> None:
+        """Add a new item to the registry with its owner module.
+
+        Args:
+            item: The item to be stored in the registry.
+            owner: The module claiming ownership of the item.
+
+        Raises:
+            ValueError: If an item with the same key already exists.
+        """
         key = self._get_key(item)
         if key in self._data:
             msg = f'The {self._name} "{key}" already exists in the registry.'
@@ -36,6 +54,14 @@ class Registry[K: abc.Hashable, D]:
         owner.metadata.add_register(registered)
 
     def add_register(self, register: RegistrationData[D]) -> None:
+        """Add an existing RegistrationData entry directly to the registry.
+
+        Args:
+            register: The pre-constructed RegistrationData wrapper.
+
+        Raises:
+            ValueError: If an item with the same key already exists.
+        """
         key = self._get_key(register.data)
         if key in self._data:
             msg = f'The {self._name} "{key}" already exists in the registry.'
@@ -43,6 +69,17 @@ class Registry[K: abc.Hashable, D]:
         self._data[key] = register
 
     def remove(self, key: K) -> D:
+        """Remove and return an item from the registry by its key.
+
+        Args:
+            key: The key of the item to remove.
+
+        Returns:
+            The unregistered item instance.
+
+        Raises:
+            KeyError: If no item matches the provided key.
+        """
         registered = self._data.get(key)
         if registered is None:
             msg = f'The {self._name} "{key}" was not found in the registry.'
@@ -53,17 +90,41 @@ class Registry[K: abc.Hashable, D]:
         return registered.data
 
     def get(self, key: K) -> D | None:
+        """Retrieve an item by its key, or None if not found.
+
+        Args:
+            key: The unique key to look up.
+
+        Returns:
+            The item instance if registered, otherwise None.
+        """
         registered = self._data.get(key)
         return registered.data if registered else None
 
     def get_registers(self) -> tuple[RegistrationData[D], ...]:
+        """Return all registered items as a tuple.
+
+        Returns:
+            A tuple containing all RegistrationData wrappers.
+        """
         return tuple(self._data.values())
 
     def merge(self, registers: abc.Sequence[RegistrationData[D]]) -> None:
+        """Merge a sequence of registration items into this registry.
+
+        Args:
+            registers: Sequence of RegistrationData entries to merge.
+        """
         for register in registers:
             self.add_register(register)
 
     def unmerge(self, item: RegistrationData[D], destination: typing.Self) -> None:
+        """Transfer a registration item from this registry to a destination registry.
+
+        Args:
+            item: The registration item to transfer.
+            destination: The target registry where the item will be added.
+        """
         key = self._get_key(item.data)
         if key in self._data:
             del self._data[key]
@@ -84,10 +145,18 @@ class Registry[K: abc.Hashable, D]:
 
 
 class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
+    """Registry for Discord event responders."""
+
     def __init__(self) -> None:
         super().__init__("event", lambda i: i.event)
 
     def add(self, item: commands.EventResponder, owner: Module) -> None:
+        """Add an event responder.
+
+        Args:
+            item: The EventResponder containing the target event and callback(s).
+            owner: The module registering the responder.
+        """
         key = self._get_key(item)
         if key in self._data:
             self._data[key].data.callbacks.update(item.callbacks)
@@ -98,6 +167,11 @@ class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
         owner.metadata.add_register(registered)
 
     def merge(self, registers: typing.Sequence[RegistrationData[commands.EventResponder]]) -> None:
+        """Merge a sequence of event responders.
+
+        Args:
+            registers: Sequence of event responder registrations to merge.
+        """
         for register in registers:
             data = register.data
             if data.event in self._data:
@@ -112,6 +186,12 @@ class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
         item: RegistrationData[commands.EventResponder],
         destination: Registry[type[hikari.Event], commands.EventResponder],
     ) -> None:
+        """Unmerge an event responder.
+
+        Args:
+            item: The registration item to unmerge.
+            destination: The target registry where the unmerged responder will reside.
+        """
         data = item.data
         if data.event in self._data:
             self._data[data.event].data.callbacks.difference_update(data.callbacks)
@@ -125,35 +205,49 @@ class EventRegistry(Registry[type[hikari.Event], commands.EventResponder]):
 
 
 class SlashCommandRegistry(Registry[str, commands.SlashCommand]):
+    """Registry for Discord application slash commands."""
+
     def __init__(self) -> None:
         super().__init__("slash command", lambda i: i.name)
 
 
 class UserMenuRegistry(Registry[str, commands.UserMenu]):
+    """Registry for user context menu commands."""
+
     def __init__(self) -> None:
         super().__init__("user menu", lambda i: i.name)
 
 
 class MessageMenuRegistry(Registry[str, commands.MessageMenu]):
+    """Registry for message context menu commands."""
+
     def __init__(self) -> None:
         super().__init__("message menu", lambda i: i.name)
 
 
 class ButtonRegistry(Registry[str, components.Button]):
+    """Registry for interactive button components."""
+
     def __init__(self) -> None:
         super().__init__("button", lambda i: i.custom_id)
 
 
 class SelectMenuRegistry(Registry[str, components.SelectMenu]):
+    """Registry for interactive select menu components."""
+
     def __init__(self) -> None:
         super().__init__("select menu", lambda i: i.custom_id)
 
 
 class ModalRegistry(Registry[str, components.Modal]):
+    """Registry for modal form submit interactions."""
+
     def __init__(self) -> None:
         super().__init__("modal", lambda i: i.custom_id)
 
 
 class ErrorRegistry(Registry[type[Exception], handlers.ErrorResponder]):
+    """Registry for exception handlers keyed by exception class."""
+
     def __init__(self) -> None:
         super().__init__("error", lambda i: i.error)

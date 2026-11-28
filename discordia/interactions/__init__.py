@@ -1,3 +1,5 @@
+"""Discord application interactions, commands, components, and event responders."""
+
 from .commands import MessageMenu, Option, SlashCommand, SubCommand, SubCommandGroup, UserMenu
 from .components import Button, Modal, SelectMenu
 from .event import EventResponder

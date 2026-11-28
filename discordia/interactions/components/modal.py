@@ -1,17 +1,32 @@
-from collections.abc import Awaitable, Callable
-from typing import Any
+"""Modal dialog interaction responder."""
+
+from __future__ import annotations
+
+import typing
 
 import attrs
 import hikari
 
-from discordia import di
+if typing.TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from discordia import di
 
 
 @attrs.define()
 class Modal:
-    # This is a temporary implementation for the modal, it will be changed once the v2 modal system is implemented
-    callback: Callable[..., Awaitable[Any]] = attrs.field()
+    """Represents a modal submit interaction responder."""
+
+    callback: Callable[..., Awaitable[typing.Any]] = attrs.field()
+    """Callable executed when the modal form is submitted."""
+
     custom_id: str = attrs.field()
+    """Unique string identifying the modal component."""
 
     def validate(self, validator: di.DependencyManager) -> None:
+        """Validate parameter dependencies for the modal callback.
+
+        Args:
+            validator: The DependencyManager used to validate dependencies.
+        """
         validator.validate(self.callback, {hikari.ComponentInteraction})

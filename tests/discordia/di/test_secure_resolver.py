@@ -13,10 +13,10 @@ from discordia.signatures import SecureResolver, SignatureManager
 @pytest.fixture(autouse=True)
 def reset_signature_cache():
     SignatureManager.clear_cache()
-    SecureResolver._call_stack.clear()
+    SecureResolver._func_stack.clear()
     yield
     SignatureManager.clear_cache()
-    SecureResolver._call_stack.clear()
+    SecureResolver._func_stack.clear()
 
 
 class ForwardService:

@@ -1,3 +1,7 @@
+"""Core Bot class."""
+
+from __future__ import annotations
+
 import hikari
 
 from discordia import modules, router
@@ -5,7 +9,15 @@ from discordia.di import DependencyManager
 
 
 class Bot(modules.Module):
+    """Main application class for Discordia bots."""
+
     def __init__(self, gateway_bot: hikari.GatewayBot, divider: str | None = None) -> None:
+        """Initialize the bot application.
+
+        Args:
+            gateway_bot: The underlying Hikari GatewayBot instance.
+            divider: Optional delimiter string used to namespace custom_ids.
+        """
         super().__init__()
         self._gateway_bot = gateway_bot
         self._di = DependencyManager()
@@ -42,12 +54,22 @@ class Bot(modules.Module):
             error_handler.validate(self._di)
 
     def validate_setup(self) -> None:
+        """Validate dependencies for all registered callbacks.
+
+        Raises:
+            DependencyError: If any registered callback has unsatisfiable dependencies.
+        """
         self._validate_events()
         self._validate_commands()
         self._validate_components()
         self._validate_handlers()
 
     async def sync_commands(self, guild: int | hikari.UndefinedType = hikari.UNDEFINED) -> None:
+        """Synchronize application commands with Discord.
+
+        Args:
+            guild: Target guild ID to sync commands to. UNDEFINED for global commands.
+        """
         rest = self._gateway_bot.rest
         app = await rest.fetch_application()
         commands: list[hikari.api.CommandBuilder] = []
@@ -60,12 +82,15 @@ class Bot(modules.Module):
 
     @property
     def gateway(self) -> hikari.GatewayBot:
+        """The Hikari GatewayBot instance."""
         return self._gateway_bot
 
     @property
     def di(self) -> DependencyManager:
+        """The DependencyManager associated with this bot."""
         return self._di
 
     @property
     def routing(self) -> router.Routing:
+        """The Routing subsystem."""
         return self._routing

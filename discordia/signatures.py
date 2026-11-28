@@ -1,3 +1,5 @@
+"""Utilities for inspecting and resolving function and callable signatures."""
+
 from __future__ import annotations
 
 import inspect
@@ -12,15 +14,40 @@ if typing.TYPE_CHECKING:
 
 
 def is_annotated(annotation: object) -> bool:
+    """Check whether an annotation is an Annotated type.
+
+    Args:
+        annotation: The annotation to inspect.
+
+    Returns:
+        True if the annotation is an Annotated type, False otherwise.
+    """
     return typing.get_origin(annotation) is typing.Annotated
 
 
 def is_union(annotation: object) -> bool:
+    """Check whether an annotation is a Union type.
+
+    Args:
+        annotation: The annotation to inspect.
+
+    Returns:
+        True if the annotation is a Union or UnionType, False otherwise.
+    """
     origin = typing.get_origin(annotation)
     return origin is typing.Union or origin is types.UnionType
 
 
 def is_equals(source: object, target: object) -> bool:
+    """Check whether the source type matches or is compatible with the target type.
+
+    Args:
+        source: The source type or annotation to check.
+        target: The target type or annotation to match against.
+
+    Returns:
+        True if source equals target, is a subclass, or satisfies its type union.
+    """
     if source == target or target is typing.Any or target is object:
         return True
 
@@ -48,8 +75,17 @@ def is_equals(source: object, target: object) -> bool:
     return False
 
 
-def find_for_type[T](callback: abc.Callable[..., object], target: type[T]) -> type[T] | None:
-    signature = SignatureManager.get_signature(callback)
+def find_for_type[T](func: abc.Callable[..., object], target: type[T]) -> type[T] | None:
+    """Look for a parameter whose type satisfies the target in a function signature.
+
+    Args:
+        func: The callable whose signature will be inspected.
+        target: The target type to search for.
+
+    Returns:
+        The matching parameter annotation if found, or None otherwise.
+    """
+    signature = SignatureManager.get_signature(func)
     for param in signature.parameters.values():
         if is_equals(param.annotation, target):
             return param.annotation
@@ -79,21 +115,37 @@ def _get_callable_globals(fn: abc.Callable[..., object]) -> dict[str, typing.Any
 
 
 class SecureResolver:
-    _call_stack: list[abc.Callable[..., typing.Any]] = []  # noqa: RUF012
+    """An object that safely resolves function signatures without falling into recursion cycles."""
 
-    def __init__(self, call: abc.Callable[..., typing.Any]) -> None:
-        self._call = call
+    _call_stack: list[abc.Callable[..., typing.Any]] = []  # noqa: RUF012
+    _func_stack = _call_stack
+
+    def __init__(self, func: abc.Callable[..., typing.Any]) -> None:
+        """Initialize the resolver.
+
+        Args:
+            func: The callable whose signature will be resolved.
+        """
+        self._func = func
         self._current_parameter: inspect.Parameter | None = None
 
     def resolve(self) -> inspect.Signature:
-        if self._call in self._call_stack:
-            raise errors.CircularSignatureError(self._call)
+        """Resolve and build the signature of the wrapped callable.
 
-        self._call_stack.append(self._call)
+        Returns:
+            The resolved function signature.
+
+        Raises:
+            CircularSignatureError: If a cycle was found in the function signature.
+        """
+        if self._func in self._func_stack:
+            raise errors.CircularSignatureError(self._func)
+
+        self._func_stack.append(self._func)
         try:
             return self._build_signature()
         finally:
-            self._call_stack.pop()
+            self._func_stack.pop()
 
     def _resolve_annotation_string(
         self,
@@ -105,7 +157,7 @@ class SecureResolver:
             return eval(annotation_str, globalns, localns)  # noqa: S307
         except errors.CircularSignatureError as error:
             if self._current_parameter is not None:
-                error.add_path(self._call, self._current_parameter)
+                error.add_path(self._func, self._current_parameter)
             raise
         except NameError:
             return annotation_str
@@ -125,12 +177,12 @@ class SecureResolver:
         return annotation
 
     def _build_signature(self) -> inspect.Signature:
-        raw_sig = inspect.signature(self._call)
+        raw_sig = inspect.signature(self._func)
 
-        globalns = _get_callable_globals(self._call)
+        globalns = _get_callable_globals(self._func)
         localns: dict[str, typing.Any] = {}
-        if isinstance(self._call, type):
-            localns[self._call.__name__] = self._call
+        if isinstance(self._func, type):
+            localns[self._func.__name__] = self._func
 
         new_params: list[inspect.Parameter] = []
         for param in raw_sig.parameters.values():
@@ -145,25 +197,45 @@ class SecureResolver:
 
 
 class SignatureManager:
+    """Safely resolves function signatures and manages their cache."""
+
     _cache: dict[abc.Callable[..., object], inspect.Signature] = {}  # noqa: RUF012
 
     @classmethod
-    def get_signature(cls, callback: abc.Callable[..., object], *, cache: bool = True) -> inspect.Signature:
-        cached_signature = cls._cache.get(callback)
+    def get_signature(cls, func: abc.Callable[..., object], *, cache: bool = True) -> inspect.Signature:
+        """Get the function signature.
+
+        Args:
+            func: The callable to inspect.
+            cache: Whether to cache the function signature. Defaults to True.
+
+        Returns:
+            The resolved function signature.
+
+        Raises:
+            CircularSignatureError: If a cycle was found in the function signature.
+        """
+        cached_signature = cls._cache.get(func)
         if cached_signature is not None:
             return cached_signature
 
-        signature = SecureResolver(callback).resolve()
+        signature = SecureResolver(func).resolve()
 
         if cache:
-            cls._cache[callback] = signature
+            cls._cache[func] = signature
         return signature
 
     @classmethod
-    def discard_cache(cls, callback: abc.Callable[..., object]) -> None:
-        if cls._cache.get(callback):
-            del cls._cache[callback]
+    def discard_cache(cls, func: abc.Callable[..., object]) -> None:
+        """Discard the cached signature for a specific callable.
+
+        Args:
+            func: The callable whose cached signature should be discarded.
+        """
+        if cls._cache.get(func):
+            del cls._cache[func]
 
     @classmethod
     def clear_cache(cls) -> None:
+        """Clear all cached signatures."""
         cls._cache.clear()

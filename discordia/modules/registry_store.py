@@ -1,3 +1,5 @@
+"""Registry store encapsulating all types of registries."""
+
 from __future__ import annotations
 
 import typing
@@ -11,6 +13,8 @@ from discordia.modules import registries
 
 @attrs.define()
 class RegistryStore:
+    """Central storage holding all category-specific registries in a module."""
+
     events: registries.EventRegistry = attrs.field(factory=registries.EventRegistry, init=False)
     slash_commands: registries.SlashCommandRegistry = attrs.field(factory=registries.SlashCommandRegistry, init=False)
     user_menus: registries.UserMenuRegistry = attrs.field(factory=registries.UserMenuRegistry, init=False)
@@ -23,6 +27,7 @@ class RegistryStore:
     _map: dict[type, registries.Registry[typing.Any, typing.Any]] = attrs.field(init=False)
 
     def __attrs_post_init__(self) -> None:
+        """Map supported interaction and handler types to their dedicated registries."""
         self._map = {
             commands.SlashCommand: self.slash_commands,
             commands.UserMenu: self.user_menus,
@@ -35,11 +40,25 @@ class RegistryStore:
         }
 
     def merge(self, other: RegistryStore) -> None:
+        """Merge all entries from another registry store into this store.
+
+        Args:
+            other: The source RegistryStore whose items will be merged.
+        """
         for data_type, my_registry in self._map.items():
             other_registry = other._map[data_type]
             my_registry.merge(other_registry.get_registers())
 
     def unmerge(self, registries: set[registries.RegistrationData[typing.Any]], destination: RegistryStore) -> None:
+        """Unmerge specified registration items from this store into a destination store.
+
+        Args:
+            registries: Set of registration items to remove from this store.
+            destination: Target RegistryStore to receive the unmerged registrations.
+
+        Raises:
+            ValueError: If an item's data type is not recognized by any registered category.
+        """
         for registry in registries:
             data = registry.data
             data_type: type[typing.Any] = type(data)  # type: ignore[reportUnknownVariableType]

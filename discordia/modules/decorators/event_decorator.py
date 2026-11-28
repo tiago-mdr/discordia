@@ -1,21 +1,48 @@
+"""Decorator interface for registering Discord gateway event listeners."""
+
+from __future__ import annotations
+
 import typing
-from collections import abc
 
 from hikari import events
 
 from discordia import signatures
 from discordia.interactions import commands
-from discordia.modules.module import Module
+
+if typing.TYPE_CHECKING:
+    from collections import abc
+
+    from discordia.modules.module import Module
 
 
 class EventDecorator:
-    # possible event namespace here
+    """Provides decorators to bind callbacks to Hikari gateway events."""
+
     def __init__(self, owner: Module) -> None:
+        """Initialize the event decorator for an owner module.
+
+        Args:
+            owner: The module instance that owns this decorator namespace.
+        """
         self._owner = owner
 
     def listen[E: events.Event](
         self, event_type: type[E] | None = None
     ) -> abc.Callable[[abc.Callable[typing.Concatenate[E, ...], abc.Awaitable[typing.Any]]], commands.EventResponder]:
+        """Register an asynchronous callback to listen for a Discord gateway event.
+
+        Args:
+            event_type: The specific Hikari event class to listen for. If None, the
+                event type is inferred from the first parameter annotation of type
+                Event in the callback.
+
+        Returns:
+            A decorator function returning the registered EventResponder.
+
+        Raises:
+            TypeError: If event_type is not provided and cannot be inferred from the callback signature.
+        """
+
         def wrapper(
             callback: abc.Callable[typing.Concatenate[E, ...], abc.Awaitable[typing.Any]],
         ) -> commands.EventResponder:

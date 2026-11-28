@@ -1,19 +1,26 @@
+"""Event and interaction routing subsystem connecting Hikari events to Discordia responders."""
+
+from __future__ import annotations
+
 import typing
 
 import hikari
-from hikari.api import EventManager
 
 from discordia import errors
-from discordia.di import DependencyManager
-from discordia.modules import registry_store
 
 if typing.TYPE_CHECKING:
+    from hikari.api import EventManager
+
+    from discordia.di import DependencyManager
     from discordia.interactions.components.modal import Modal
+    from discordia.modules import registry_store
 
 
 # this is a temporary implementation
 # as the way interactions are executed is updated, this will also change significantly
 class Routing:
+    """Dispatches incoming Hikari events and Discord interactions to registered handlers."""
+
     def __init__(
         self,
         registers: registry_store.RegistryStore,
@@ -21,6 +28,14 @@ class Routing:
         event_manager: EventManager,
         divider: str | None = None,
     ) -> None:
+        """Initialize the routing system and subscribe internal routers to the EventManager.
+
+        Args:
+            registers: The central RegistryStore of the application.
+            executor: The DependencyManager used to execute callbacks with DI.
+            event_manager: The Hikari EventManager to subscribe to.
+            divider: Optional namespace delimiter string for custom_ids.
+        """
         self._registers = registers
         self._executor = executor
         self._event_manager = event_manager
@@ -28,6 +43,14 @@ class Routing:
         self._set_routers()
 
     async def route_slash_command(self, interaction: hikari.CommandInteraction) -> None:
+        """Route an application slash command interaction to its responder callback.
+
+        Args:
+            interaction: The incoming CommandInteraction payload.
+
+        Raises:
+            InteractionNotFoundError: If no matching slash command is registered.
+        """
         slash_command = self._registers.slash_commands.get(interaction.command_name)
         if slash_command:
             responder = slash_command.parse_interaction(interaction)
@@ -38,6 +61,14 @@ class Routing:
         raise errors.InteractionNotFoundError(msg)
 
     async def route_message_menu(self, interaction: hikari.CommandInteraction) -> None:
+        """Route a message context menu interaction to its responder callback.
+
+        Args:
+            interaction: The incoming CommandInteraction payload.
+
+        Raises:
+            InteractionNotFoundError: If no matching message menu is registered.
+        """
         message_menu = self._registers.message_menus.get(interaction.command_name)
         if message_menu:
             message = message_menu.extract_message(interaction)
@@ -48,6 +79,14 @@ class Routing:
         raise errors.InteractionNotFoundError(msg)
 
     async def route_user_menu(self, interaction: hikari.CommandInteraction) -> None:
+        """Route a user context menu interaction to its responder callback.
+
+        Args:
+            interaction: The incoming CommandInteraction payload.
+
+        Raises:
+            InteractionNotFoundError: If no matching user menu is registered.
+        """
         user_menu = self._registers.user_menus.get(interaction.command_name)
         if user_menu:
             user = user_menu.parse_user_menu(interaction)
@@ -58,6 +97,14 @@ class Routing:
         raise errors.InteractionNotFoundError(msg)
 
     async def route_command_interaction(self, interaction_event: hikari.CommandInteractionCreateEvent) -> None:
+        """Dispatch incoming command interaction events by command type.
+
+        Args:
+            interaction_event: The CommandInteractionCreateEvent received from Hikari.
+
+        Raises:
+            CommandInteractionRoutingError: If an unhandled exception occurs during command routing.
+        """
         interaction = interaction_event.interaction
 
         try:
@@ -76,6 +123,15 @@ class Routing:
     async def route_autocomplete_interaction(
         self, autocomplete_event: hikari.AutocompleteInteractionCreateEvent
     ) -> None:
+        """Dispatch incoming autocomplete interactions to registered command handlers.
+
+        Args:
+            autocomplete_event: The AutocompleteInteractionCreateEvent received from Hikari.
+
+        Raises:
+            InteractionNotFoundError: If no matching command is found for autocomplete.
+            AutoCompleteRoutinError: If an error occurs during autocomplete execution.
+        """
         interaction = autocomplete_event.interaction
         slash_command = self._registers.slash_commands.get(interaction.command_name)
 
@@ -90,6 +146,14 @@ class Routing:
             raise errors.AutoCompleteRoutinError(autocomplete_event) from e
 
     async def route_button_interaction(self, interaction: hikari.ComponentInteraction) -> None:
+        """Route an interactive button component click to its registered callback.
+
+        Args:
+            interaction: The incoming ComponentInteraction payload.
+
+        Raises:
+            InteractionNotFoundError: If no registered button matches the custom_id.
+        """
         custom_id_namespaces = interaction.custom_id.split(self._divider)
 
         for namespace in reversed(custom_id_namespaces):
@@ -102,6 +166,14 @@ class Routing:
         raise errors.InteractionNotFoundError(msg)
 
     async def route_select_menu_interaction(self, interaction: hikari.ComponentInteraction) -> None:
+        """Route an interactive select menu submission to its registered callback.
+
+        Args:
+            interaction: The incoming ComponentInteraction payload.
+
+        Raises:
+            InteractionNotFoundError: If no registered select menu matches the custom_id.
+        """
         custom_id_namespaces = interaction.custom_id.split(self._divider)
 
         for namespace in reversed(custom_id_namespaces):
@@ -117,6 +189,14 @@ class Routing:
     async def route_component_interaction(
         self, component_interaction_event: hikari.ComponentInteractionCreateEvent
     ) -> None:
+        """Dispatch incoming component interaction events by component type.
+
+        Args:
+            component_interaction_event: The ComponentInteractionCreateEvent received from Hikari.
+
+        Raises:
+            ComponentInteractionRoutingError: If an unhandled exception occurs during component routing.
+        """
         interaction = component_interaction_event.interaction
 
         try:
@@ -137,6 +217,15 @@ class Routing:
             raise errors.ComponentInteractionRoutingError(component_interaction_event) from e
 
     async def route_modal_interaction(self, modal_interaction_event: hikari.ModalInteractionCreateEvent) -> None:
+        """Dispatch incoming modal submission interactions to registered modal handlers.
+
+        Args:
+            modal_interaction_event: The ModalInteractionCreateEvent received from Hikari.
+
+        Raises:
+            InteractionNotFoundError: If no registered modal matches the custom_id.
+            ModalRoutingError: If an unhandled error occurs during modal routing.
+        """
         interaction = modal_interaction_event.interaction
         custom_id_namespaces = interaction.custom_id.split(self._divider)
 
@@ -155,6 +244,11 @@ class Routing:
             raise errors.ModalRoutingError(modal_interaction_event) from e
 
     async def route_event(self, event: hikari.Event) -> None:
+        """Dispatch general gateway events to all registered event responders.
+
+        Args:
+            event: The incoming Hikari Event instance.
+        """
         for event_type in event.dispatches():
             event_responder = self._registers.events.get(event_type)
 
@@ -163,6 +257,11 @@ class Routing:
                     await self._executor.execute(callback, event)
 
     async def route_error(self, error_event: hikari.ExceptionEvent[typing.Any]) -> None:
+        """Dispatch an unhandled exception event to a registered error handler.
+
+        Args:
+            error_event: The ExceptionEvent trigged by Hikari containing the exception.
+        """
         error = error_event.exception
         error_handler = self._registers.errors.get(type(error))
 

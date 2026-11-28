@@ -1,3 +1,5 @@
+"""Discordia - A simple, powerful, and modular Discord framework, built on top of Hikari."""
+
 from .bot import Bot as Bot
 from .di import inject as inject
 from .interactions import Button as Button

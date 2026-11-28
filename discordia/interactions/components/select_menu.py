@@ -1,21 +1,39 @@
+"""Select menu message component interaction responder and value parser."""
+
+from __future__ import annotations
+
 import typing
-from collections.abc import Awaitable, Callable
 from typing import Any, get_origin
 
 import attrs
 import hikari
 
-from discordia import di, signatures
+from discordia import signatures
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from discordia import di
 
 
 @attrs.define()
 class SelectMenu:
+    """Represents an interactive select menu message component responder."""
+
     callback: Callable[..., Awaitable[Any]] = attrs.field()
+    """Callable executed when selections are submitted."""
+
     custom_id: str = attrs.field()
+    """Unique string identifying the select menu component."""
+
     type: hikari.ComponentType = attrs.field()
+    """The specific ComponentType"""
+
     field: str = attrs.field(default="", init=False)
+    """Parameter name on callback that will receive the parsed values list."""
 
     def __attrs_post_init__(self) -> None:
+        """Validate the component type and infer the injected values parameter."""
         if self.type not in (
             hikari.ComponentType.TEXT_SELECT_MENU,
             hikari.ComponentType.USER_SELECT_MENU,
@@ -47,7 +65,6 @@ class SelectMenu:
 
     def _extract_field(self) -> str | None:
         signature = signatures.SignatureManager.get_signature(self.callback)
-
         for parameter in signature.parameters.values():
             if parameter.annotation is parameter.empty or get_origin(parameter.annotation) is not list:
                 continue
@@ -73,6 +90,17 @@ class SelectMenu:
         return response
 
     def parse_select_menu(self, interaction: hikari.ComponentInteraction) -> dict[str, list[typing.Any]]:
+        """Extract and resolve selected values from the interaction component payload.
+
+        Args:
+            interaction: The incoming component interaction.
+
+        Returns:
+            Dictionary mapping the callback parameter field to the resolved list of values.
+
+        Raises:
+            ValueError: If the select menu type requires resolved data but none is present.
+        """
         response: dict[str, list[typing.Any]] = {}
         if not self.field:
             return response
@@ -113,5 +141,10 @@ class SelectMenu:
         return response
 
     def validate(self, validator: di.DependencyManager) -> None:
+        """Validate parameter injection requirements for the select menu callback.
+
+        Args:
+            validator: The DependencyManager used to validate dependencies.
+        """
         lazy_types = {hikari.ComponentInteraction, list}
         validator.validate(self.callback, lazy_types)

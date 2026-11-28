@@ -1,3 +1,7 @@
+"""Definition and buld of slash commands, subcommands, and groups."""
+
+from __future__ import annotations
+
 import typing
 from collections import abc
 
@@ -13,26 +17,59 @@ if typing.TYPE_CHECKING:
 
 @attrs.define()
 class Option:
+    """Configuration metadata for a slash command option."""
+
     name: str = attrs.field(default="")
+    """Name of the option. Defaults to the parameter name."""
+
     description: str = attrs.field(default="...")
+    """Description of the option in Discord UI."""
+
     type: hikari.OptionType | None = attrs.field(default=None)
+    """Option type in Discord."""
+
     is_required: bool | None = attrs.field(default=None)
+    """Whether the option is required."""
+
     choices: abc.Sequence[hikari.CommandChoice] | None = attrs.field(default=None)
-    options: abc.Sequence[hikari.CommandOption] | None = attrs.field(default=None)
+    """Preset choices for the option value."""
+
     channel_types: abc.Sequence[hikari.ChannelType | int] | None = attrs.field(default=None)
+    """Restricts channel options to specific channel types."""
+
     autocomplete: bool = attrs.field(default=False)
+    """Whether this option triggers an autocomplete interaction."""
+
     min_value: int | float | None = attrs.field(default=None)
+    """Minimum numeric value allowed."""
+
     max_value: int | float | None = attrs.field(default=None)
+    """Maximum numeric value allowed."""
+
     name_localizations: abc.Mapping[hikari.Locale | str, str] = attrs.field(factory=dict[hikari.Locale | str, str])
+    """Localized names for the option across Discord client locales."""
+
     description_localizations: abc.Mapping[hikari.Locale | str, str] = attrs.field(
         factory=dict[hikari.Locale | str, str]
     )
+    """Localized descriptions across Discord client locales."""
+
     min_length: int | None = attrs.field(default=None)
+    """Minimum character length for string options."""
+
     max_length: int | None = attrs.field(default=None)
+    """Maximum character length for string options."""
 
 
 class SlashCommandExtractor:
+    """Inspects a callback signature to extract and construct cmmand option specifications."""
+
     def __init__(self, callback: abc.Callable[..., object]) -> None:
+        """Initialize the extractor for a callback.
+
+        Args:
+            callback: The slash command handler callback to inspect.
+        """
         self.callback = callback
         self.current_parameter: inspect.Parameter
 
@@ -73,15 +110,13 @@ class SlashCommandExtractor:
             )
             raise errors.SlashCommandDefinitionError(msg, self.callback, self.current_parameter)
 
-        # Additional validation can be encapsulated in an option build method
-        # and caught as SlashCommandDefinitionError if needed
         return hikari.CommandOption(
             type=option.type,
             name=option.name,
             description=option.description,
             is_required=option.is_required,
             choices=option.choices,
-            options=option.options,
+            options=None,  # the sub-options are not created here.
             channel_types=option.channel_types,
             autocomplete=option.autocomplete,
             min_value=option.min_value,
@@ -168,6 +203,11 @@ class SlashCommandExtractor:
         return None
 
     def extract(self) -> dict[str, hikari.CommandOption]:
+        """Extract command option mappings from the callback parameters.
+
+        Returns:
+            A mapping from parameter name to configured CommandOption instances.
+        """
         option_map: dict[str, hikari.CommandOption] = {}
         signature = signatures.SignatureManager.get_signature(self.callback)
 
@@ -187,12 +227,19 @@ class SlashCommandExtractor:
 
 @attrs.define()
 class SlashCommandParsed:
+    """Represents the parsed execution target and arguments for a slash command."""
+
     callback: abc.Callable[..., abc.Awaitable[typing.Any]] = attrs.field()
+    """Asynchronous callback function to invoke."""
+
     data: dict[str, object] = attrs.field()
+    """Dictionary of parsed option names and extracted values."""
 
 
 @attrs.define()
 class SlashCommandResponder:
+    """Manages the response flow for slash commands and their autocompletes."""
+
     callback: abc.Callable[..., abc.Awaitable[typing.Any]] = attrs.field()
     option_map: dict[str, hikari.CommandOption] = attrs.field(init=False)
     autocomplete: dict[str, abc.Callable[..., abc.Awaitable[typing.Any]]] = attrs.field(
@@ -234,6 +281,11 @@ class SlashCommandResponder:
                 return None
 
     def validate(self, validator: di.DependencyManager) -> None:
+        """Validate the possibility of executing the callback using the DI system.
+
+        Args:
+            validator: The DependencyManager used to validate dependencies.
+        """
         lazy_types = {
             str,
             bool,
@@ -252,6 +304,18 @@ class SlashCommandResponder:
         options: abc.Sequence[hikari.CommandInteractionOption] | None = None,
         resolved: hikari.ResolvedOptionData | None = None,
     ) -> dict[str, object]:
+        """Parse incoming interaction options into a parameter value mapping.
+
+        Args:
+            options: Received interaction option sequence.
+            resolved: Resolved Discord entity data.
+
+        Returns:
+            Dictionary mapping parameter names to their extracted values.
+
+        Raises:
+            TypeError: If an option receives a mismatched type or a required option is omitted.
+        """
         data: dict[str, object] = {}
         if options is None:
             options = []
@@ -287,6 +351,17 @@ class SlashCommandResponder:
     def parse_autocomplete(
         self, autocomplete_options: abc.Sequence[hikari.AutocompleteInteractionOption] | None = None
     ) -> SlashCommandParsed:
+        """Identify the focused option and retrieve its autocomplete callback.
+
+        Args:
+            autocomplete_options: Sequence of autocomplete options from the interaction.
+
+        Returns:
+            A SlashCommandParsed pointing to the autocomplete callback and parsed values.
+
+        Raises:
+            ValueError: If no options are provided or no focused option is found.
+        """
         result: dict[str, object] = {}
         name: str | None = None
 
@@ -312,6 +387,8 @@ class SlashCommandResponder:
 
 @attrs.define()
 class SubCommand:
+    """Represents a subcommand in a Discord slash command hierarchy."""
+
     name: str = attrs.field()
     description: str = attrs.field(default="...")
     name_localizations: abc.Mapping[hikari.Locale | str, str] = attrs.field(factory=dict[hikari.Locale | str, str])
@@ -321,19 +398,49 @@ class SubCommand:
     _responder: SlashCommandResponder | None = attrs.field(default=None, init=False)
 
     def get_responder(self) -> SlashCommandResponder:
+        """Get the configured SlashCommandResponder.
+
+        Returns:
+            The SlashCommandResponder for this subcommand.
+
+        Raises:
+            ValueError: If no responder callback has been attached.
+        """
         if self._responder:
             return self._responder
         msg = f'Subcommand "{self.name}" does not have a registered responder callback.'
         raise ValueError(msg)
 
     def responder(self, func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
+        """Set the handler callback for this subcommand.
+
+        Args:
+            func: Callable to handle this subcommand.
+
+        Returns:
+            Self instance for method chaining.
+        """
         self._responder = SlashCommandResponder(func)
         return self
 
     def validate(self, validator: di.DependencyManager) -> None:
+        """Validate dependencies for this subcommand.
+
+        Args:
+            validator: The DependencyManager used to validate dependencies.
+        """
         self.get_responder().validate(validator)
 
     def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], typing.Self]:
+        """Register an autocomplete handler for a specific option of this subcommand.
+
+        Args:
+            name: Parameter name of the option to handle autocomplete for.
+
+        Returns:
+            A decorator function returning self.
+        """
+
         def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
             responder = self.get_responder()
             responder.autocomplete[name] = func
@@ -346,12 +453,35 @@ class SubCommand:
         subcommand_options: abc.Sequence[hikari.CommandInteractionOption] | None = None,
         resolved: hikari.ResolvedOptionData | None = None,
     ) -> SlashCommandParsed:
+        """Parse interaction options for this subcommand into a SlashCommandParsed container.
+
+        Args:
+            subcommand_options: Nested option sequence for this subcommand.
+            resolved: Resolved Discord entity data.
+
+        Returns:
+            A SlashCommandParsed instance.
+
+        Raises:
+            ValueError: If no responder callback has been attached.
+        """
         responder = self.get_responder()
         return SlashCommandParsed(responder.callback, responder.parse_options(subcommand_options, resolved))
 
     def parse_subcommand_autocomplete(
         self, autocomplete: abc.Sequence[hikari.AutocompleteInteractionOption] | None = None
     ) -> SlashCommandParsed:
+        """Parse autocomplete interaction for this subcommand.
+
+        Args:
+            autocomplete: Nested autocomplete options.
+
+        Returns:
+            A SlashCommandParsed instance pointing to the autocomplete callback.
+
+        Raises:
+            ValueError: If no autocomplete or callback handler is registered.
+        """
         responder = self.get_responder()
         if responder.autocomplete:
             return responder.parse_autocomplete(autocomplete)
@@ -360,6 +490,11 @@ class SubCommand:
         raise ValueError(msg)
 
     def build(self) -> hikari.CommandOption:
+        """Build a Discord command option representation for this subcommand.
+
+        Returns:
+            A CommandOption of type SUB_COMMAND.
+        """
         responder = self._responder
         options = list(responder.option_map.values()) if responder else []
         return hikari.CommandOption(
@@ -374,6 +509,8 @@ class SubCommand:
 
 @attrs.define()
 class SubCommandGroup:
+    """Represents a subcommand group containing nested subcommands."""
+
     name: str = attrs.field()
     description: str = attrs.field(default="...")
     name_localizations: abc.Mapping[hikari.Locale | str, str] = attrs.field(factory=dict[hikari.Locale | str, str])
@@ -389,6 +526,18 @@ class SubCommandGroup:
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
     ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], SubCommand]:
+        """Declare a nested subcommand within this group.
+
+        Args:
+            name: Subcommand name. Defaults to the decorated function name if empty.
+            description: Subcommand description.
+            name_localizations: Localized names across locales.
+            description_localizations: Localized descriptions across locales.
+
+        Returns:
+            A decorator returning the created SubCommand instance.
+        """
+
         def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> SubCommand:
             subcommand_name = name or func.__name__
             subcommand = SubCommand(
@@ -404,12 +553,31 @@ class SubCommandGroup:
         return wrapper
 
     def add_subcommand(self, subcommand: SubCommand) -> None:
+        """Add a SubCommand instance to this group.
+
+        Args:
+            subcommand: The SubCommand to add.
+
+        Raises:
+            ValueError: If a subcommand with the same name already exists in this group.
+        """
         if subcommand.name in self.subcommands:
             msg = f'Subcommand "{subcommand.name}" already exists in command group "{self.name}".'
             raise ValueError(msg)
         self.subcommands[subcommand.name] = subcommand
 
     def get_subcommand(self, subcommand_name: str) -> SubCommand:
+        """Retrieve a nested subcommand by name.
+
+        Args:
+            subcommand_name: The name of the subcommand.
+
+        Returns:
+            The matching SubCommand instance.
+
+        Raises:
+            ValueError: If the subcommand is not found in this group.
+        """
         subcommand = self.subcommands.get(subcommand_name)
         if subcommand:
             return subcommand
@@ -418,6 +586,11 @@ class SubCommandGroup:
         raise ValueError(msg)
 
     def validate(self, validator: di.DependencyManager) -> None:
+        """Validate dependencies for all subcommands within this group.
+
+        Args:
+            validator: The DependencyManager used to validate dependencies.
+        """
         for subcommand in self.subcommands.values():
             subcommand.validate(validator)
 
@@ -426,6 +599,18 @@ class SubCommandGroup:
         subcommand_interaction: hikari.CommandInteractionOption,
         resolved: hikari.ResolvedOptionData | None = None,
     ) -> SlashCommandParsed:
+        """Parse an interaction directed at a subcommand within this group.
+
+        Args:
+            subcommand_interaction: The interaction option corresponding to this group.
+            resolved: Resolved Discord entity data.
+
+        Returns:
+            A SlashCommandParsed instance for the targeted subcommand.
+
+        Raises:
+            ValueError: If the nested subcommand name is not registered.
+        """
         subcommand = self.subcommands.get(subcommand_interaction.name)
         if subcommand is None:
             msg = f'Subcommand "{subcommand_interaction.name}" was not found in command group "{self.name}".'
@@ -436,6 +621,17 @@ class SubCommandGroup:
     def parse_autocomplete_group(
         self, subcommand_autocomplete: hikari.AutocompleteInteractionOption
     ) -> SlashCommandParsed:
+        """Parse an autocomplete interaction targeting a subcommand within this group.
+
+        Args:
+            subcommand_autocomplete: The autocomplete option for this group.
+
+        Returns:
+            A SlashCommandParsed pointing to the targeted subcommand's autocomplete callback.
+
+        Raises:
+            ValueError: If the nested subcommand is not found.
+        """
         subcommand = self.subcommands.get(subcommand_autocomplete.name)
         if subcommand is None:
             msg = f'Subcommand "{subcommand_autocomplete.name}" was not found in command group "{self.name}".'
@@ -444,6 +640,11 @@ class SubCommandGroup:
         return subcommand.parse_subcommand_autocomplete(subcommand_autocomplete.options)
 
     def build(self) -> hikari.CommandOption:
+        """Build a Discord command option representation for this subcommand.
+
+        Returns:
+            A CommandOption of type SUB_COMMAND_GROUP with nested subcommands.
+        """
         options = [subcommand.build() for subcommand in self.subcommands.values()]
         return hikari.CommandOption(
             type=hikari.OptionType.SUB_COMMAND_GROUP,
@@ -457,6 +658,8 @@ class SubCommandGroup:
 
 @attrs.define()
 class SlashCommand:
+    """Represents a top-level Discord application slash command."""
+
     name: str = attrs.field()
     description: str = attrs.field(default="...")
     default_member_permissions: hikari.UndefinedType | hikari.Permissions = attrs.field(default=UNDEFINED)
@@ -475,10 +678,27 @@ class SlashCommand:
     _responder: SlashCommandResponder | None = attrs.field(default=None, init=False)
 
     def responder(self, func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
+        """Set the top-level handler callback for this slash command.
+
+        Args:
+            func: Callable handling command executions.
+
+        Returns:
+            Self instance for method chaining.
+        """
         self._responder = SlashCommandResponder(func)
         return self
 
     def autocomplete(self, name: str) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], typing.Self]:
+        """Register an autocomplete handler for a top-level option.
+
+        Args:
+            name: Parameter name of the option to handle autocomplete for.
+
+        Returns:
+            A decorator function returning self.
+        """
+
         def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> typing.Self:
             responder = self.get_responder()
             responder.autocomplete[name] = func
@@ -487,28 +707,60 @@ class SlashCommand:
         return wrapper
 
     def get_responder(self) -> SlashCommandResponder:
+        """Get the configured SlashCommandResponder.
+
+        Returns:
+            The SlashCommandResponder for this command.
+
+        Raises:
+            ValueError: If no responder callback has been attached.
+        """
         if self._responder:
             return self._responder
         msg = f'Slash command "{self.name}" does not have a registered responder callback.'
         raise ValueError(msg)
 
     def validate(self, validator: di.DependencyManager) -> None:
-        if self._subcommands or self._subcommands_group:
-            for subcommand in self._subcommands.values():
-                subcommand.validate(validator)
+        """Validate dependencies for this command and all subcommands/groups.
 
-            for subcommand_group in self._subcommands_group.values():
-                subcommand_group.validate(validator)
-        elif self._responder:
+        Args:
+            validator: The DependencyManager used to validate dependencies.
+        """
+        if self._responder:
             self._responder.validate(validator)
 
+        for subcommand in self._subcommands.values():
+            subcommand.validate(validator)
+
+        for subcommand_group in self._subcommands_group.values():
+            subcommand_group.validate(validator)
+
     def add_subcommand(self, subcommand: SubCommand) -> None:
+        """Add a SubCommand to this slash command.
+
+        Args:
+            subcommand: The SubCommand to register.
+
+        Raises:
+            ValueError: If a subcommand with the same name already exists.
+        """
         if subcommand.name in self._subcommands:
             msg = f'Subcommand "{subcommand.name}" already exists in slash command "{self.name}".'
             raise ValueError(msg)
         self._subcommands[subcommand.name] = subcommand
 
     def get_subcommand(self, subcommand_name: str) -> SubCommand:
+        """Retrieve a direct subcommand by name.
+
+        Args:
+            subcommand_name: The name of the subcommand.
+
+        Returns:
+            The matching SubCommand instance.
+
+        Raises:
+            KeyError: If the subcommand is not found.
+        """
         subcommand = self._subcommands.get(subcommand_name)
         if subcommand:
             return subcommand
@@ -523,6 +775,18 @@ class SlashCommand:
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
     ) -> abc.Callable[[abc.Callable[..., abc.Awaitable[typing.Any]]], SubCommand]:
+        """Declare a direct subcommand under this slash command.
+
+        Args:
+            name: Subcommand name.
+            description: Subcommand description.
+            name_localizations: Localized names across locales.
+            description_localizations: Localized descriptions across locales.
+
+        Returns:
+            A decorator returning the created SubCommand instance.
+        """
+
         def wrapper(func: abc.Callable[..., abc.Awaitable[typing.Any]]) -> SubCommand:
             subcommand = SubCommand(
                 name,
@@ -537,6 +801,14 @@ class SlashCommand:
         return wrapper
 
     def add_subcommand_group(self, subcommand_group: SubCommandGroup) -> None:
+        """Add a SubCommandGroup to this slash command.
+
+        Args:
+            subcommand_group: The SubCommandGroup to add.
+
+        Raises:
+            ValueError: If a subcommand group with the same name already exists.
+        """
         if subcommand_group.name in self._subcommands_group:
             msg = f'Subcommand group "{subcommand_group.name}" already exists in slash command "{self.name}".'
             raise ValueError(msg)
@@ -549,6 +821,17 @@ class SlashCommand:
         name_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
         description_localizations: abc.Mapping[hikari.Locale | str, str] | None = None,
     ) -> SubCommandGroup:
+        """Declare a subcommand group under this slash command.
+
+        Args:
+            name: Group name.
+            description: Group description.
+            name_localizations: Localized names across locales.
+            description_localizations: Localized descriptions across locales.
+
+        Returns:
+            The configured SubCommandGroup instance.
+        """
         group = SubCommandGroup(
             name,
             description=description,
@@ -559,6 +842,17 @@ class SlashCommand:
         return group
 
     def get_subcommand_group(self, subcommand_group_name: str) -> SubCommandGroup:
+        """Retrieve a subcommand group by name.
+
+        Args:
+            subcommand_group_name: Name of the subcommand group.
+
+        Returns:
+            The matching SubCommandGroup instance.
+
+        Raises:
+            KeyError: If the subcommand group is not found.
+        """
         subcommand_group = self._subcommands_group.get(subcommand_group_name)
         if subcommand_group:
             return subcommand_group
@@ -582,6 +876,14 @@ class SlashCommand:
         return None
 
     def parse_interaction(self, interaction: hikari.CommandInteraction) -> SlashCommandParsed:
+        """Parse an incoming command interaction into target callback and arguments.
+
+        Args:
+            interaction: The incoming CommandInteraction payload.
+
+        Returns:
+            A SlashCommandParsed instance.
+        """
         if interaction.options:
             option = interaction.options[0]
 
@@ -591,7 +893,6 @@ class SlashCommand:
 
             subcommand_group = self._unwrap_subcommand_group(option)
             if subcommand_group:
-                # Subcommand group guarantees that a nested subcommand option exists
                 assert option.options is not None
                 return subcommand_group.parse_interaction_group(option.options[0], interaction.resolved)
 
@@ -602,6 +903,17 @@ class SlashCommand:
         )
 
     def parse_autocomplete_interaction(self, autocomplete: hikari.AutocompleteInteraction) -> SlashCommandParsed:
+        """Parse an incoming autocomplete interaction to its designated callback.
+
+        Args:
+            autocomplete: The incoming AutocompleteInteraction payload.
+
+        Returns:
+            A SlashCommandParsed instance.
+
+        Raises:
+            ValueError: If no autocomplete handler is registered.
+        """
         if autocomplete.options:
             option = autocomplete.options[0]
 
@@ -611,7 +923,6 @@ class SlashCommand:
 
             subcommand_group = self._unwrap_subcommand_group(option)
             if subcommand_group:
-                # Subcommand group guarantees that a nested subcommand option exists
                 assert option.options is not None
                 return subcommand_group.parse_autocomplete_group(option.options[0])
 
@@ -623,6 +934,11 @@ class SlashCommand:
         raise ValueError(msg)
 
     def build(self) -> hikari.impl.SlashCommandBuilder:
+        """Build the slash command for registration on Discord.
+
+        Returns:
+            A configured SlashCommandBuilder instance ready for command sync.
+        """
         options: list[hikari.CommandOption] = []
 
         if self._subcommands or self._subcommands_group:
